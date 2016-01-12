@@ -125,7 +125,7 @@ copy_swap_helper(const Type& other)
     return other;
 }
 
-} // close fundamentals_v3
+} // close fundamentals_v2
 } // close experimental
 } // close std
 
