@@ -1,6 +1,6 @@
-// using_allocator.t.cpp                  -*-C++-*-
+// uses_allocator.t.cpp                  -*-C++-*-
 
-#include "using_allocator.h"
+#include "uses_allocator.h"
 
 #include <iostream>
 #include <vector>
@@ -19,6 +19,9 @@ class MySTLAlloc
 public:
     explicit MySTLAlloc(int id = -1) : m_id(id) { }
 
+    template <class U>
+    MySTLAlloc(const MySTLAlloc<U>& other) : m_id(other.id()) { }
+    
     int id() const { return m_id; }
 };
 
@@ -192,32 +195,75 @@ bool operator!=(const TestType<Alloc, Prefix>& a,
 }
 
 static int errorCount = 0;
+class TestContext
+{
+    const TestContext* m_prevContext;
+    const char*        m_str;
+    static const TestContext* s_currContext;
+
+public:
+    static const TestContext* currContext() { return s_currContext; }
+    
+    TestContext(const char* str) : m_prevContext(s_currContext), m_str(str) {
+        s_currContext = this;
+    }
+        
+    ~TestContext() { s_currContext = m_prevContext; }
+
+    const TestContext* prevContext() const { return m_prevContext; }
+    const char* str() const { return m_str; }
+};
+const TestContext *TestContext::s_currContext = nullptr;
+
 #define TEST_ASSERT(c) do {                                             \
         if (! (c)) {                                                    \
             std::cout << __FILE__ << ':' << __LINE__                    \
                       << ": Assertion failed: " #c << std::endl;        \
+            for (const TestContext* ctx = TestContext::currContext();   \
+                 ctx; ctx = ctx->prevContext())                         \
+                std::cout << "Context: " << ctx->str() << std::endl;    \
             ++errorCount;                                               \
         }                                                               \
     } while (false)
 
+template <class Alloc, bool Prefix, bool usesAlloc, bool usesMemRsrc>
+void runTest()
+{
+    typedef TestType<Alloc, Prefix> Obj;
+    typedef MySTLAlloc<char>        CharAlloc;
+    typedef MySTLAlloc<int>         IntAlloc;
+    typedef pmr::memory_resource*   pmr_ptr;
+
+    constexpr bool usesTypeErasure = usesAlloc && usesMemRsrc;
+    constexpr int val = 3;  // Value stored in constructed objects
+
+    // IntAlloc A0; // Default
+    // IntAlloc A1(1);
+    // IntAlloc A2(2);
+    // MyMemResource& R0 = DefaultResource;
+    // MyMemResource R1(1), *pR1 = &R1;
+    // MyMemResource R2(2), *pR2 = &R2;
+
+    TEST_ASSERT(usesAlloc   == (exp::uses_allocator<Obj, CharAlloc>::value));
+    TEST_ASSERT(usesMemRsrc == (exp::uses_allocator<Obj, pmr_ptr>::value));
+}
+             
+
 int main()
 {
-    typedef MySTLAlloc<int> IntAlloc;
+    typedef MySTLAlloc<int>       IntAlloc;
     typedef pmr::memory_resource* pmr_ptr;
-    IntAlloc A0; // Default
-    IntAlloc A1(1);
-    IntAlloc A2(2);
-    MyMemResource& R0 = DefaultResource;
-    MyMemResource R1(1), *pR1 = &R1;
-    MyMemResource R2(2), *pR2 = &R2;
+    typedef exp::erased_type      ET;
 
-    TEST_ASSERT(! (exp::uses_allocator<TestType<NoAlloc>, IntAlloc>::value));
-    TEST_ASSERT(  (exp::uses_allocator<TestType<IntAlloc>, IntAlloc>::value));
-    TEST_ASSERT(! (exp::uses_allocator<TestType<pmr::memory_resource*>, IntAlloc>::value));
-    TEST_ASSERT(  (exp::uses_allocator<TestType<exp::erased_type>, IntAlloc>::value));
+#define TEST(Alloc, Prefix, usesAlloc, usesMemRsrc) do {        \
+        TestContext tc("TestType<" #Alloc "," #Prefix ">");     \
+        runTest<Alloc, Prefix, usesAlloc, usesMemRsrc>();       \
+    } while (false)
 
-    TEST_ASSERT(! (exp::uses_allocator<TestType<NoAlloc>, MyMemResource*>::value));
-    TEST_ASSERT(! (exp::uses_allocator<TestType<IntAlloc>, MyMemResource*>::value));
-    TEST_ASSERT(  (exp::uses_allocator<TestType<pmr::memory_resource*>, MyMemResource*>::value));
-    TEST_ASSERT(  (exp::uses_allocator<TestType<exp::erased_type>, MyMemResource*>::value));
+    TEST(NoAlloc,  0, 0, 0);
+    TEST(IntAlloc, 0, 1, 0);
+    TEST(pmr_ptr,  0, 0, 1);
+    TEST(ET,       0, 1, 1);
+
+//    using internal::make_args_uses_allocator;
 }
