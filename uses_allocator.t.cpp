@@ -221,10 +221,65 @@ const TestContext *TestContext::s_currContext = nullptr;
                       << ": Assertion failed: " #c << std::endl;        \
             for (const TestContext* ctx = TestContext::currContext();   \
                  ctx; ctx = ctx->prevContext())                         \
-                std::cout << "Context: " << ctx->str() << std::endl;    \
+                std::cout << "  Context: " << ctx->str() << std::endl;  \
             ++errorCount;                                               \
         }                                                               \
     } while (false)
+
+// Implementation of `match_tuple_element` (below).
+// The primary template is used when `I` is in bounds.
+template <std::size_t I, typename T, typename Tuple,
+          bool InBounds = (I < std::tuple_size<Tuple>::value)>
+struct match_tuple_element_imp
+{
+private:
+    template <typename U>
+    static bool do_match(const Tuple& tpl, const U& val, std::true_type)
+        { return std::get<I>(tpl) == val; }
+
+    template <typename U>
+    static bool do_match(const Tuple&, const U&, std::false_type)
+        { return false; }
+
+public:
+    static constexpr bool match_type = 
+          std::is_same<typename std::tuple_element<I,Tuple>::type, T>::value;
+
+    template <typename U>
+    static bool match_value(const Tuple& tpl, const U& val) {
+        return do_match(tpl, val, std::integral_constant<bool, match_type>());
+    }
+};
+
+// Implementation of `match_tuple_element` (below).
+// This specialization is used when `I` is out of bounds.
+template <std::size_t I, typename T, typename Tuple>
+struct match_tuple_element_imp<I, T, Tuple, false>
+{
+    static constexpr bool match_type = false;
+
+    template <typename U>
+    static bool match_value(const Tuple&, const U&) {
+        return false;
+    }
+};
+
+// Returns true if the `I`th element of a tuple `tpl` is of type exactly
+// matching the specified template parameter type `T` and has a value that
+// compares equal to the specified `value`; otherwise returns false.
+// If `I` is out of bounds, compiles correctly and always returns false.
+template <std::size_t I, typename T, typename Tuple, typename U>
+bool match_tuple_element(const Tuple& tpl, const U& value) {
+    return match_tuple_element_imp<I, T, Tuple>::match_value(tpl, value);
+}
+
+// Returns true if the `I`th element of a tuple `tpl` is of type exactly
+// matching the specified template parameter type `T` otherwise returns false.
+// If `I` is out of bounds, compiles correctly and always returns false.
+template <std::size_t I, typename T, typename Tuple>
+bool match_tuple_element(const Tuple& tpl) {
+    return match_tuple_element_imp<I, T, Tuple>::match_type;
+}
 
 template <class Alloc, bool Prefix, bool usesAlloc, bool usesMemRsrc>
 void runTest()
@@ -233,19 +288,75 @@ void runTest()
     typedef MySTLAlloc<char>        CharAlloc;
     typedef MySTLAlloc<int>         IntAlloc;
     typedef pmr::memory_resource*   pmr_ptr;
+    typedef MyMemResource*          MyPmrPtr;
+
+    using std::allocator_arg;
+    using std::allocator_arg_t;
 
     constexpr bool usesTypeErasure = usesAlloc && usesMemRsrc;
     constexpr int val = 3;  // Value stored in constructed objects
 
-    // IntAlloc A0; // Default
-    // IntAlloc A1(1);
-    // IntAlloc A2(2);
-    // MyMemResource& R0 = DefaultResource;
-    // MyMemResource R1(1), *pR1 = &R1;
-    // MyMemResource R2(2), *pR2 = &R2;
+    IntAlloc A0; // Default
+    IntAlloc A1(1);
+    IntAlloc A2(2);
+    MyMemResource& R0 = DefaultResource;
+    MyMemResource R1(1); MyPmrPtr pR1 = &R1;
+    MyMemResource R2(2); MyPmrPtr pR2 = &R2;
 
     TEST_ASSERT(usesAlloc   == (exp::uses_allocator<Obj, CharAlloc>::value));
     TEST_ASSERT(usesMemRsrc == (exp::uses_allocator<Obj, pmr_ptr>::value));
+
+    {
+        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1);
+        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
+        const std::size_t expNumArgs = usesAlloc ? (Prefix ? 2 : 1) : 0;
+        const std::size_t allocArg = (usesAlloc && Prefix) ? 1 : numArgs - 1;
+        TEST_ASSERT(expNumArgs == numArgs);
+        TEST_ASSERT(usesAlloc ==
+                    (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
+        TEST_ASSERT((usesAlloc && Prefix) ==
+                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+    }
+
+    {
+        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1, 7);
+        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
+        const std::size_t expNumArgs = usesAlloc ? (Prefix ? 3 : 2) : 1;
+        const std::size_t valArg = (usesAlloc && Prefix) ? numArgs - 1 : 0;
+        const std::size_t allocArg = (usesAlloc && Prefix) ? 1 : numArgs - 1;
+        TEST_ASSERT(expNumArgs == numArgs);
+        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, 7)));
+        TEST_ASSERT(usesAlloc ==
+                    (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
+        TEST_ASSERT((usesAlloc && Prefix) ==
+                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+    }
+
+    {
+        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, pR1);
+        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
+        const std::size_t expNumArgs = usesMemRsrc ? (Prefix ? 2 : 1) : 0;
+        const std::size_t rsrcArg = (usesMemRsrc && Prefix) ? 1 : numArgs - 1;
+        TEST_ASSERT(expNumArgs == numArgs);
+        TEST_ASSERT(usesMemRsrc ==
+                    (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
+        TEST_ASSERT((usesMemRsrc && Prefix) ==
+                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+    }
+
+    {
+        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg,pR1,7);
+        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
+        const std::size_t expNumArgs = usesMemRsrc ? (Prefix ? 3 : 2) : 1;
+        const std::size_t valArg = (usesMemRsrc && Prefix) ? numArgs - 1 : 0;
+        const std::size_t rsrcArg = (usesMemRsrc && Prefix) ? 1 : numArgs - 1;
+        TEST_ASSERT(expNumArgs == numArgs);
+        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, 7)));
+        TEST_ASSERT(usesMemRsrc ==
+                    (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
+        TEST_ASSERT((usesMemRsrc && Prefix) ==
+                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+    }
 }
              
 
@@ -255,15 +366,17 @@ int main()
     typedef pmr::memory_resource* pmr_ptr;
     typedef exp::erased_type      ET;
 
-#define TEST(Alloc, Prefix, usesAlloc, usesMemRsrc) do {        \
+#define TEST(Alloc, Prefix, expUsesAlloc, expUsesMemRsrc) do {  \
         TestContext tc("TestType<" #Alloc "," #Prefix ">");     \
-        runTest<Alloc, Prefix, usesAlloc, usesMemRsrc>();       \
+        runTest<Alloc, Prefix, expUsesAlloc, expUsesMemRsrc>(); \
     } while (false)
 
     TEST(NoAlloc,  0, 0, 0);
     TEST(IntAlloc, 0, 1, 0);
     TEST(pmr_ptr,  0, 0, 1);
     TEST(ET,       0, 1, 1);
-
-//    using internal::make_args_uses_allocator;
+    TEST(NoAlloc,  1, 0, 0);
+    TEST(IntAlloc, 1, 1, 0);
+    TEST(pmr_ptr,  1, 0, 1);
+    TEST(ET,       1, 1, 1);
 }

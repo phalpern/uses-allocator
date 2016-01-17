@@ -77,9 +77,9 @@ struct uses_allocator_imp<T, Alloc, void_t<typename T::allocator_type>>
 // This overload is handles types for which `uses_allocator<T, Alloc>` is false.
 template <class T, class Unused, class Alloc, class... Args>
 auto forward_uses_allocator_imp(false_type /* uses_allocator */,
-                                 Unused     /* uses prefix allocator arg */,
-                                 allocator_arg_t, const Alloc&,
-                                 Args&&... args)
+                                Unused     /* uses prefix allocator arg */,
+                                allocator_arg_t, const Alloc&,
+                                Args&&... args)
 {
     // Allocator is ignored
     return std::forward_as_tuple(std::forward<Args>(args)...);
@@ -107,9 +107,9 @@ auto forward_uses_allocator_imp(true_type /* uses_allocator */,
 // This function will produce invalid results unless `T(args..., a)` is valid.
 template <class T, class Alloc, class... Args>
 auto forward_uses_allocator_imp(true_type  /* uses_allocator */,
-                                 false_type /* prefix allocator arg */,
-                                 allocator_arg_t, const Alloc& a,
-                                 Args&&... args)
+                                false_type /* prefix allocator arg */,
+                                allocator_arg_t, const Alloc& a,
+                                Args&&... args)
 {
     // Allocator added to end of argument list
     return std::forward_as_tuple(std::forward<Args>(args)..., a);
@@ -128,6 +128,7 @@ auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
     return forward_uses_allocator_imp<T>(uses_allocator<T, Alloc>(),
                                          is_constructible<T, allocator_arg_t,
                                                           Alloc, Args...>(),
+                                         allocator_arg, a,
                                          std::forward<Args>(args)...);
 }
 
