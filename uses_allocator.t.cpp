@@ -293,6 +293,8 @@ void runTest()
     using std::allocator_arg;
     using std::allocator_arg_t;
 
+    constexpr bool PrefixAlloc = (usesAlloc && Prefix);
+    constexpr bool PrefixRsrc  = (usesMemRsrc && Prefix);
     constexpr bool usesTypeErasure = usesAlloc && usesMemRsrc;
     constexpr int val = 3;  // Value stored in constructed objects
 
@@ -310,11 +312,11 @@ void runTest()
         auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesAlloc ? (Prefix ? 2 : 1) : 0;
-        const std::size_t allocArg = (usesAlloc && Prefix) ? 1 : numArgs - 1;
+        const std::size_t allocArg = PrefixAlloc ? 1 : numArgs - 1;
         TEST_ASSERT(expNumArgs == numArgs);
         TEST_ASSERT(usesAlloc ==
                     (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
-        TEST_ASSERT((usesAlloc && Prefix) ==
+        TEST_ASSERT(PrefixAlloc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
     }
 
@@ -322,13 +324,13 @@ void runTest()
         auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1, 7);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesAlloc ? (Prefix ? 3 : 2) : 1;
-        const std::size_t valArg = (usesAlloc && Prefix) ? numArgs - 1 : 0;
-        const std::size_t allocArg = (usesAlloc && Prefix) ? 1 : numArgs - 1;
+        const std::size_t valArg = PrefixAlloc ? numArgs - 1 : 0;
+        const std::size_t allocArg = PrefixAlloc ? 1 : numArgs - 1;
         TEST_ASSERT(expNumArgs == numArgs);
         TEST_ASSERT((match_tuple_element<valArg, int&&>(args, 7)));
         TEST_ASSERT(usesAlloc ==
                     (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
-        TEST_ASSERT((usesAlloc && Prefix) ==
+        TEST_ASSERT(PrefixAlloc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
     }
 
@@ -336,11 +338,11 @@ void runTest()
         auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, pR1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesMemRsrc ? (Prefix ? 2 : 1) : 0;
-        const std::size_t rsrcArg = (usesMemRsrc && Prefix) ? 1 : numArgs - 1;
+        const std::size_t rsrcArg = PrefixRsrc ? 1 : numArgs - 1;
         TEST_ASSERT(expNumArgs == numArgs);
         TEST_ASSERT(usesMemRsrc ==
                     (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
-        TEST_ASSERT((usesMemRsrc && Prefix) ==
+        TEST_ASSERT(PrefixRsrc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
     }
 
@@ -348,13 +350,13 @@ void runTest()
         auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg,pR1,7);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesMemRsrc ? (Prefix ? 3 : 2) : 1;
-        const std::size_t valArg = (usesMemRsrc && Prefix) ? numArgs - 1 : 0;
-        const std::size_t rsrcArg = (usesMemRsrc && Prefix) ? 1 : numArgs - 1;
+        const std::size_t valArg = PrefixRsrc ? numArgs - 1 : 0;
+        const std::size_t rsrcArg = PrefixRsrc ? 1 : numArgs - 1;
         TEST_ASSERT(expNumArgs == numArgs);
         TEST_ASSERT((match_tuple_element<valArg, int&&>(args, 7)));
         TEST_ASSERT(usesMemRsrc ==
                     (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
-        TEST_ASSERT((usesMemRsrc && Prefix) ==
+        TEST_ASSERT(PrefixRsrc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
     }
 }
