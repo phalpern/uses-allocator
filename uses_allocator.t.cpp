@@ -74,6 +74,9 @@ protected:
 public:
     typedef AllocType allocator_type;
     Alloc get_allocator() const { return m_alloc; }
+    template <typename A2>
+    bool match_allocator(const A2& a2) const { return a2.id() == m_alloc.id(); }
+    bool match_resource(pmr::memory_resource*) const { return false; }
 };
 
 template <> 
@@ -83,6 +86,10 @@ protected:
     typedef NoAlloc AllocType;
     TestTypeBase() { }
     TestTypeBase(const AllocType&) { }
+public:
+    template <typename A2>
+    bool match_allocator(const A2&) const { return false; }
+    bool match_resource(pmr::memory_resource*) const { return false; }
 };
 
 template <> 
@@ -97,6 +104,10 @@ protected:
 public:
     typedef AllocType allocator_type;
     AllocType get_memory_resource() const { return m_alloc; }
+    template <typename A2>
+    bool match_allocator(const A2&) const { return false; }
+    bool match_resource(pmr::memory_resource* r) const 
+        { return *r == *m_alloc; }
 };
 
 template <> 
@@ -111,7 +122,7 @@ protected:
         AllocEraser() : m_resource_p(&DefaultResource) { }
         template <typename A> AllocEraser(const A& a)
             : m_resource(a.id()), m_resource_p(&m_resource) { }
-        AllocEraser(pmr::memory_resource* const &r)
+        template <typename R> AllocEraser(R *const &r)
             : m_resource_p(r) { }
         AllocEraser(const AllocEraser& other)
             : m_resource(other.m_resource) 
@@ -120,6 +131,10 @@ protected:
                 m_resource_p = &m_resource;
             else
                 m_resource_p = other.m_resource_p;
+        }
+        int id() const {
+            MyMemResource* mmr = dynamic_cast<MyMemResource*>(m_resource_p);
+            return mmr ? mmr->id() : -1;
         }
     };
 
@@ -132,6 +147,11 @@ public:
     typedef AllocType allocator_type;
     pmr::memory_resource* get_memory_resource() const
         { return m_alloc.m_resource_p; }
+    template <typename A2>
+    bool match_allocator(const A2& a2) const
+        { return a2.id() == m_alloc.id(); }
+    bool match_resource(pmr::memory_resource* r) const 
+        { return *r == *m_alloc.m_resource_p; }
 };
 
 // Template to generate test types.
@@ -296,18 +316,46 @@ void runTest()
     constexpr bool PrefixAlloc = (usesAlloc && Prefix);
     constexpr bool PrefixRsrc  = (usesMemRsrc && Prefix);
     constexpr bool usesTypeErasure = usesAlloc && usesMemRsrc;
-    constexpr int val = 3;  // Value stored in constructed objects
+
+    int val = 3;  // Value stored into constructed objects
 
     IntAlloc A0; // Default
     IntAlloc A1(1);
-    IntAlloc A2(2);
-    MyMemResource& R0 = DefaultResource;
+    MyPmrPtr pR0 = &DefaultResource;
     MyMemResource R1(1); MyPmrPtr pR1 = &R1;
-    MyMemResource R2(2); MyPmrPtr pR2 = &R2;
 
     TEST_ASSERT(usesAlloc   == (exp::uses_allocator<Obj, CharAlloc>::value));
     TEST_ASSERT(usesMemRsrc == (exp::uses_allocator<Obj, pmr_ptr>::value));
 
+    // Test with no constructor arguments
+    {
+        auto args = std::tuple<>();
+        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
+        const std::size_t expNumArgs = 0;
+        TEST_ASSERT(expNumArgs == numArgs);
+
+        Obj V = exp::make_from_tuple<Obj>(args);
+        TEST_ASSERT(0 == V.value());
+        TEST_ASSERT(usesAlloc == V.match_allocator(A0));
+        TEST_ASSERT(usesMemRsrc == V.match_resource(pR0));
+    }
+
+    // Test with value.
+    {
+        auto args = std::tuple<int&&>(std::move(val));
+        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
+        const std::size_t expNumArgs = 1;
+        const std::size_t valArg = 0;
+        TEST_ASSERT(expNumArgs == numArgs);
+        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, val)));
+
+        Obj V = exp::make_from_tuple<Obj>(args);
+        TEST_ASSERT(val == V.value());
+        TEST_ASSERT(usesAlloc == V.match_allocator(A0));
+        TEST_ASSERT(usesMemRsrc == V.match_resource(pR0));
+    }
+
+    // Test with allocator
     {
         auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
@@ -318,22 +366,35 @@ void runTest()
                     (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
         TEST_ASSERT(PrefixAlloc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
+
+        Obj V = exp::make_from_tuple<Obj>(args);
+        TEST_ASSERT(0 == V.value());
+        TEST_ASSERT(usesAlloc == V.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
     }
 
+    // Test with allocator and value.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1, 7);
+        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1,
+                                                          std::move(val));
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesAlloc ? (Prefix ? 3 : 2) : 1;
         const std::size_t valArg = PrefixAlloc ? numArgs - 1 : 0;
         const std::size_t allocArg = PrefixAlloc ? 1 : numArgs - 1;
         TEST_ASSERT(expNumArgs == numArgs);
-        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, 7)));
+        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, val)));
         TEST_ASSERT(usesAlloc ==
                     (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
         TEST_ASSERT(PrefixAlloc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
+
+        Obj V = exp::make_from_tuple<Obj>(args);
+        TEST_ASSERT(val == V.value());
+        TEST_ASSERT(usesAlloc == V.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
     }
 
+    // Test memory resource
     {
         auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, pR1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
@@ -344,20 +405,32 @@ void runTest()
                     (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
         TEST_ASSERT(PrefixRsrc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
+
+        Obj V = exp::make_from_tuple<Obj>(args);
+        TEST_ASSERT(0 == V.value());
+        TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
     }
 
+    // Test with memory resource and value.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg,pR1,7);
+        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg,pR1,
+                                                          std::move(val));
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesMemRsrc ? (Prefix ? 3 : 2) : 1;
         const std::size_t valArg = PrefixRsrc ? numArgs - 1 : 0;
         const std::size_t rsrcArg = PrefixRsrc ? 1 : numArgs - 1;
         TEST_ASSERT(expNumArgs == numArgs);
-        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, 7)));
+        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, val)));
         TEST_ASSERT(usesMemRsrc ==
                     (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
         TEST_ASSERT(PrefixRsrc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
+
+        Obj V = exp::make_from_tuple<Obj>(args);
+        TEST_ASSERT(val == V.value());
+        TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
     }
 }
              
