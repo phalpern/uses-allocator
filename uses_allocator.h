@@ -51,13 +51,6 @@ bool operator!=(const memory_resource& a, const memory_resource& b)
 // Forward declare all types and functions
 ////////////////////////////////////////////////////////////////////////
 
-template <class T, class Alloc> struct uses_allocator;
-
-template <class T, class... Args>
-T make_from_tuple(const tuple<Args...>& tuple_args);
-
-////////////////////////////////////////////////////////////////////////
-
 namespace internal {
 
 template <bool V> using boolean_constant = integral_constant<bool, V>;
@@ -181,7 +174,24 @@ T* uninitialized_construct_from_tuple(T* p, const tuple<Args...>& tuple_args)
 }
 
 template <class T, class Alloc, class... Args>
-T make_via_uses_allocator(allocator_arg_t, const Alloc&, Args&&... args);
+T make_using_allocator(allocator_arg_t, const Alloc& a, Args&&... args)
+{
+    return make_from_tuple<T>(
+        forward_uses_allocator_args<T>(allocator_arg, a,
+                                       forward<Args>(args)...));
+                                                             
+}
+
+template <class T, class Alloc, class... Args>
+T* uninitialized_construct_using_allocator(T* p, 
+                                           allocator_arg_t, const Alloc& a,
+                                           Args&&... args)
+{
+    return uninitialized_construct_from_tuple(
+        p,
+        forward_uses_allocator_args<T>(allocator_arg, a,
+                                       forward<Args>(args)...));
+}
 
 } // close namespace fundamentals_v2
 } // close namespace experimental

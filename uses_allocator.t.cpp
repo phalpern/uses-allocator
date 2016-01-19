@@ -392,6 +392,19 @@ void runTest()
         TEST_ASSERT(usesAlloc == pW->match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
         pW->~Obj();
+
+        Obj X = exp::make_using_allocator<Obj>(allocator_arg, A1);
+        TEST_ASSERT(0 == X.value());
+        TEST_ASSERT(usesAlloc == X.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == X.match_resource(pR0));
+
+        Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
+                                                               allocator_arg,
+                                                               A1);
+        TEST_ASSERT(0 == pY->value());
+        TEST_ASSERT(usesAlloc == pY->match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == pY->match_resource(pR0));
+        pY->~Obj();
     }
 
     // Test with allocator and value.
@@ -419,6 +432,19 @@ void runTest()
         TEST_ASSERT(usesAlloc == pW->match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
         pW->~Obj();
+
+        Obj X = exp::make_using_allocator<Obj>(allocator_arg, A1, 7);
+        TEST_ASSERT(7 == X.value());
+        TEST_ASSERT(usesAlloc == X.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == X.match_resource(pR0));
+
+        Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
+                                                               allocator_arg,
+                                                               A1, 7);
+        TEST_ASSERT(7 == pY->value());
+        TEST_ASSERT(usesAlloc == pY->match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == pY->match_resource(pR0));
+        pY->~Obj();
     }
 
     // Test memory resource
@@ -443,6 +469,19 @@ void runTest()
         TEST_ASSERT(usesMemRsrc == pW->match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
         pW->~Obj();
+
+        Obj X = exp::make_using_allocator<Obj>(allocator_arg, pR1);
+        TEST_ASSERT(0 == X.value());
+        TEST_ASSERT(usesMemRsrc == X.match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == X.match_allocator(A0));
+
+        Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
+                                                               allocator_arg,
+                                                               pR1);
+        TEST_ASSERT(0 == pY->value());
+        TEST_ASSERT(usesMemRsrc == pY->match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == pY->match_allocator(A0));
+        pY->~Obj();
     }
 
     // Test with memory resource and value.
@@ -470,6 +509,19 @@ void runTest()
         TEST_ASSERT(usesMemRsrc == pW->match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
         pW->~Obj();
+
+        Obj X = exp::make_using_allocator<Obj>(allocator_arg, pR1, 7);
+        TEST_ASSERT(7 == X.value());
+        TEST_ASSERT(usesMemRsrc == X.match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == X.match_allocator(A0));
+
+        Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
+                                                               allocator_arg,
+                                                               pR1, 7);
+        TEST_ASSERT(7 == pY->value());
+        TEST_ASSERT(usesMemRsrc == pY->match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == pY->match_allocator(A0));
+        pY->~Obj();
     }
 }
              
