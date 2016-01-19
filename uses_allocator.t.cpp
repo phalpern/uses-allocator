@@ -310,6 +310,9 @@ void runTest()
     typedef pmr::memory_resource*   pmr_ptr;
     typedef MyMemResource*          MyPmrPtr;
 
+    char objBuffer alignas(Obj) [sizeof(Obj)];
+    Obj *pUninitObj = reinterpret_cast<Obj*>(objBuffer);
+
     using std::allocator_arg;
     using std::allocator_arg_t;
 
@@ -338,6 +341,12 @@ void runTest()
         TEST_ASSERT(0 == V.value());
         TEST_ASSERT(usesAlloc == V.match_allocator(A0));
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR0));
+
+        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
+        TEST_ASSERT(0 == pW->value());
+        TEST_ASSERT(usesAlloc == pW->match_allocator(A0));
+        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR0));
+        pW->~Obj();
     }
 
     // Test with value.
@@ -353,6 +362,12 @@ void runTest()
         TEST_ASSERT(val == V.value());
         TEST_ASSERT(usesAlloc == V.match_allocator(A0));
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR0));
+
+        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
+        TEST_ASSERT(val == pW->value());
+        TEST_ASSERT(usesAlloc == pW->match_allocator(A0));
+        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR0));
+        pW->~Obj();
     }
 
     // Test with allocator
@@ -371,6 +386,12 @@ void runTest()
         TEST_ASSERT(0 == V.value());
         TEST_ASSERT(usesAlloc == V.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
+
+        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
+        TEST_ASSERT(0 == pW->value());
+        TEST_ASSERT(usesAlloc == pW->match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
+        pW->~Obj();
     }
 
     // Test with allocator and value.
@@ -392,6 +413,12 @@ void runTest()
         TEST_ASSERT(val == V.value());
         TEST_ASSERT(usesAlloc == V.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
+
+        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
+        TEST_ASSERT(val == pW->value());
+        TEST_ASSERT(usesAlloc == pW->match_allocator(A1));
+        TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
+        pW->~Obj();
     }
 
     // Test memory resource
@@ -410,6 +437,12 @@ void runTest()
         TEST_ASSERT(0 == V.value());
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
+
+        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
+        TEST_ASSERT(0 == pW->value());
+        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
+        pW->~Obj();
     }
 
     // Test with memory resource and value.
@@ -431,6 +464,12 @@ void runTest()
         TEST_ASSERT(val == V.value());
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
+
+        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
+        TEST_ASSERT(val == pW->value());
+        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR1));
+        TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
+        pW->~Obj();
     }
 }
              

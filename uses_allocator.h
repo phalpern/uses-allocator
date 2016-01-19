@@ -139,6 +139,14 @@ T make_from_tuple_imp(const tuple<Args...>& tuple_args,
     return T(get<Indexes>(tuple_args)...);
 }
 
+template <class T, class... Args, size_t... Indexes>
+T* uninitialized_construct_from_tuple_imp(T* p,
+                                          const tuple<Args...>& tuple_args,
+                                          internal::index_list<Indexes...>)
+{
+    return ::new((void*) p) T(get<Indexes>(tuple_args)...);
+}
+    
 } // close namespace internal
 
 template <class T, class Alloc>
@@ -162,6 +170,14 @@ T make_from_tuple(const tuple<Args...>& tuple_args)
     using namespace internal;
     return make_from_tuple_imp<T>(tuple_args, 
                                   make_index_list_t<sizeof...(Args)>());
+}
+
+template <class T, class... Args>
+T* uninitialized_construct_from_tuple(T* p, const tuple<Args...>& tuple_args)
+{
+    using namespace internal;
+    return uninitialized_construct_from_tuple_imp<T>(p, tuple_args, 
+                                       make_index_list_t<sizeof...(Args)>());
 }
 
 template <class T, class Alloc, class... Args>
