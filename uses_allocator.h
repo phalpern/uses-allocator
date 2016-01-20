@@ -48,8 +48,11 @@ bool operator!=(const memory_resource& a, const memory_resource& b)
 } // close namespace pmr
 
 ////////////////////////////////////////////////////////////////////////
-// Forward declare all types and functions
-////////////////////////////////////////////////////////////////////////
+
+// Forward declaration
+template <class T, class Alloc, class... Args>
+auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
+                                 Args&&... args);
 
 namespace internal {
 
@@ -82,11 +85,27 @@ struct uses_allocator_imp<T, Alloc, void_t<typename T::allocator_type>>
         is_same<erased_type, typename T::allocator_type>::value
       > { };
 
+// Metafunction `pair_uses_allocator<T, A>` evaluates true iff `T` is a
+// specialization of `std::pair` and `uses_allocator<T::first_type, A>` and/or
+// `uses_allocator<T::second_type, A>` are true.
+template <class T, class A> 
+struct pair_uses_allocator : false_type 
+{
+};
+
+template <class T1, class T2, class A>
+struct pair_uses_allocator<pair<T1, T2>, A>
+    : boolean_constant<uses_allocator<T1, A>::value ||
+                       uses_allocator<T2, A>::value>
+{
+};
+
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
 // This overload is handles types for which `uses_allocator<T, Alloc>` is false.
 template <class T, class Unused, class Alloc, class... Args>
-auto forward_uses_allocator_imp(false_type /* uses_allocator */,
+auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
+                                false_type /* uses_allocator */,
                                 Unused     /* uses prefix allocator arg */,
                                 allocator_arg_t, const Alloc&,
                                 Args&&... args)
@@ -100,8 +119,9 @@ auto forward_uses_allocator_imp(false_type /* uses_allocator */,
 // This overload is handles types for which `uses_allocator<T, Alloc>` is
 // true and constructor `T(allocator_arg_t, a, args...)` is valid.
 template <class T, class Alloc, class... Args>
-auto forward_uses_allocator_imp(true_type /* uses_allocator */,
-                                true_type /* uses prefix allocator arg */,
+auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
+                                true_type  /* uses_allocator */,
+                                true_type  /* uses prefix allocator arg */,
                                 allocator_arg_t, const Alloc& a,
                                 Args&&... args)
 {
@@ -115,14 +135,92 @@ auto forward_uses_allocator_imp(true_type /* uses_allocator */,
 // This overload is handles types for which `uses_allocator<T, Alloc>` is
 // true and constructor `T(allocator_arg_t, a, args...)` NOT valid.
 // This function will produce invalid results unless `T(args..., a)` is valid.
-template <class T, class Alloc, class... Args>
-auto forward_uses_allocator_imp(true_type  /* uses_allocator */,
+template <class T1, class Alloc, class... Args>
+auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
+                                true_type  /* uses_allocator */,
                                 false_type /* prefix allocator arg */,
                                 allocator_arg_t, const Alloc& a,
                                 Args&&... args)
 {
     // Allocator added to end of argument list
     return std::forward_as_tuple(std::forward<Args>(args)..., a);
+}
+
+// Return a tuple of arguments appropriate for uses-allocator construction
+// with allocator `Alloc` and ctor arguments `Args`.
+// This overload is handles specializations of `std::pair` for which
+// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// no other constructor arguments are passed in.
+template <class T, class Alloc>
+auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
+                                false_type /* uses_allocator */,
+                                false_type /* prefix allocator arg */,
+                                allocator_arg_t, const Alloc& a)
+{
+    return std::make_tuple(
+        piecewise_construct,
+        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a),
+        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a));
+}
+
+// Return a tuple of arguments appropriate for uses-allocator construction
+// with allocator `Alloc` and ctor arguments `Args`.
+// This overload is handles specializations of `std::pair` for which
+// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// a single argument of type const-lvalue-of-pair is passed in.
+template <class T, class Alloc, class U1, class U2>
+auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
+                                false_type /* uses_allocator */,
+                                false_type /* prefix allocator arg */,
+                                allocator_arg_t, const Alloc& a,
+                                const pair<U1, U2>& arg)
+{
+    return std::make_tuple(
+        piecewise_construct,
+        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a,
+                                                            arg.first),
+        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a,
+                                                             arg.second));
+}
+
+// Return a tuple of arguments appropriate for uses-allocator construction
+// with allocator `Alloc` and ctor arguments `Args`.
+// This overload is handles specializations of `std::pair` for which
+// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// a single argument of type rvalue-of-pair is passed in.
+template <class T, class Alloc, class U1, class U2>
+auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
+                                false_type /* uses_allocator */,
+                                false_type /* prefix allocator arg */,
+                                allocator_arg_t, const Alloc& a,
+                                pair<U1, U2>&& arg)
+{
+    return std::make_tuple(
+        piecewise_construct,
+        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a,
+                                                      forward<U1>(arg.first)),
+        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a,
+                                                      forward<U2>(arg.second)));
+}
+
+// Return a tuple of arguments appropriate for uses-allocator construction
+// with allocator `Alloc` and ctor arguments `Args`.
+// This overload is handles specializations of `std::pair` for which
+// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// a two additional constructor arguments are passed in.
+template <class T, class Alloc, class U1, class U2>
+auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
+                                false_type /* uses_allocator */,
+                                false_type /* prefix allocator arg */,
+                                allocator_arg_t, const Alloc& a,
+                                U1&& arg1, U2&& arg2)
+{
+    return std::make_tuple(
+        piecewise_construct,
+        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a,
+                                                            forward<U1>(arg1)),
+        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a,
+                                                            forward<U2>(arg2)));
 }
 
 template <class T, class... Args, size_t... Indexes>
@@ -133,11 +231,26 @@ T make_from_tuple_imp(const tuple<Args...>& tuple_args,
 }
 
 template <class T, class... Args, size_t... Indexes>
+T make_from_tuple_imp(tuple<Args...>&& tuple_args,
+                      internal::index_list<Indexes...>)
+{
+    return T(forward<Args>(get<Indexes>(tuple_args))...);
+}
+
+template <class T, class... Args, size_t... Indexes>
 T* uninitialized_construct_from_tuple_imp(T* p,
-                                          const tuple<Args...>& tuple_args,
+                                          const tuple<Args...>& args_tuple,
                                           internal::index_list<Indexes...>)
 {
-    return ::new((void*) p) T(get<Indexes>(tuple_args)...);
+    return ::new((void*) p) T(get<Indexes>(args_tuple)...);
+}
+    
+template <class T, class... Args, size_t... Indexes>
+T* uninitialized_construct_from_tuple_imp(T* p,
+                                          tuple<Args...>&& args_tuple,
+                                          internal::index_list<Indexes...>)
+{
+    return ::new((void*) p) T(forward<Args>(get<Indexes>(args_tuple))...);
 }
     
 } // close namespace internal
@@ -150,7 +263,8 @@ auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
                                  Args&&... args)
 {
     using namespace internal;
-    return forward_uses_allocator_imp<T>(uses_allocator<T, Alloc>(),
+    return forward_uses_allocator_imp<T>(pair_uses_allocator<T, Alloc>(),
+                                         uses_allocator<T, Alloc>(),
                                          is_constructible<T, allocator_arg_t,
                                                           Alloc, Args...>(),
                                          allocator_arg, a,
@@ -158,18 +272,34 @@ auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
 }
 
 template <class T, class... Args>
-T make_from_tuple(const tuple<Args...>& tuple_args)
+T make_from_tuple(const tuple<Args...>& args_tuple)
 {
     using namespace internal;
-    return make_from_tuple_imp<T>(tuple_args, 
+    return make_from_tuple_imp<T>(args_tuple, 
                                   make_index_list_t<sizeof...(Args)>());
 }
 
 template <class T, class... Args>
-T* uninitialized_construct_from_tuple(T* p, const tuple<Args...>& tuple_args)
+T make_from_tuple(tuple<Args...>&& args_tuple)
 {
     using namespace internal;
-    return uninitialized_construct_from_tuple_imp<T>(p, tuple_args, 
+    return make_from_tuple_imp<T>(std::move(args_tuple), 
+                                  make_index_list_t<sizeof...(Args)>());
+}
+
+template <class T, class... Args>
+T* uninitialized_construct_from_tuple(T* p, const tuple<Args...>& args_tuple)
+{
+    using namespace internal;
+    return uninitialized_construct_from_tuple_imp<T>(p, args_tuple, 
+                                       make_index_list_t<sizeof...(Args)>());
+}
+
+template <class T, class... Args>
+T* uninitialized_construct_from_tuple(T* p, tuple<Args...>&& args_tuple)
+{
+    using namespace internal;
+    return uninitialized_construct_from_tuple_imp<T>(p, std::move(args_tuple), 
                                        make_index_list_t<sizeof...(Args)>());
 }
 
