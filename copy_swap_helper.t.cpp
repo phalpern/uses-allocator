@@ -37,7 +37,7 @@ bool operator!=(const memory_resource& a, const memory_resource& b)
 } // close namespace experimental
 } // close namespace std
     
-using namespace std::experimental::fundamentals_v2::internal;
+using namespace std::experimental::fundamentals_v3::internal;
 namespace pmr = std::experimental::pmr;
 
 // STL-style test allocator (doesn't meet the Allocator requirements, but
@@ -233,6 +233,7 @@ static int errorCount = 0;
 int main()
 {
     using std::experimental::copy_swap_helper;
+    using std::experimental::copy_swap;
 
     typedef MySTLAlloc<int> IntAlloc;
     typedef pmr::memory_resource* pmr_ptr;
@@ -256,8 +257,12 @@ int main()
         TEST_ASSERT(3 == cc.value());
         Obj y(copy_swap_helper(x));
         TEST_ASSERT(y == x);
-        Obj z(copy_swap_helper(std::allocator_arg, DefaultResource, x));
+        Obj q(9);
+        Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
+        Obj& yr = copy_swap(y, q);
+        TEST_ASSERT(&yr == &y);
+        TEST_ASSERT(y == q);
     }
     
     {
@@ -283,9 +288,15 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj z(copy_swap_helper(std::allocator_arg, A2, x));
+        Obj q(9, A2);
+        Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
+
+        Obj& yr = copy_swap(y, q);
+        TEST_ASSERT(&yr == &y);
+        TEST_ASSERT(y == q);
+        TEST_ASSERT(A1 == y.get_allocator());
     }
     
     {
@@ -311,9 +322,15 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj z(copy_swap_helper(std::allocator_arg, pR2, x));
+        Obj q(9, pR2);
+        Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(pR2 == z.get_memory_resource());
+
+        Obj& yr = copy_swap(y, q);
+        TEST_ASSERT(&yr == &y);
+        TEST_ASSERT(y == q);
+        TEST_ASSERT(pR1 == y.get_memory_resource());
     }
     
     {
@@ -339,9 +356,15 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj z(copy_swap_helper(std::allocator_arg, A2, x));
+        Obj q(9, A2);
+        Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(R2 == *z.get_memory_resource());
+
+        Obj& yr = copy_swap(y, q);
+        TEST_ASSERT(&yr == &y);
+        TEST_ASSERT(y == q);
+        TEST_ASSERT(R1 == *y.get_memory_resource());
     }
     
     {
@@ -367,9 +390,15 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj z(copy_swap_helper(std::allocator_arg, A2, x));
+        Obj q(std::allocator_arg, A2, 9);
+        Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
+
+        Obj& yr = copy_swap(y, q);
+        TEST_ASSERT(&yr == &y);
+        TEST_ASSERT(y == q);
+        TEST_ASSERT(A1 == y.get_allocator());
     }
     
     {
@@ -395,9 +424,15 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj z(copy_swap_helper(std::allocator_arg, pR2, x));
+        Obj q(std::allocator_arg, pR2, 9);
+        Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(pR2 == z.get_memory_resource());
+
+        Obj& yr = copy_swap(y, q);
+        TEST_ASSERT(&yr == &y);
+        TEST_ASSERT(y == q);
+        TEST_ASSERT(R1 == *y.get_memory_resource());
     }
     
     {
@@ -423,9 +458,15 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj z(copy_swap_helper(std::allocator_arg, A2, x));
+        Obj q(std::allocator_arg, A2, 9);
+        Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(R2 == *z.get_memory_resource());
+
+        Obj& yr = copy_swap(y, q);
+        TEST_ASSERT(&yr == &y);
+        TEST_ASSERT(y == q);
+        TEST_ASSERT(R1 == *y.get_memory_resource());
     }
     
 }

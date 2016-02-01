@@ -20,7 +20,7 @@ template <class... T> using void_t = typename void_t_imp<T...>::type;
 } // close cpp17
 
 namespace experimental {
-inline namespace fundamentals_v2 {
+inline namespace fundamentals_v3 {
 
 namespace internal {
 
@@ -32,6 +32,9 @@ struct uses_prefix_allocator<T,A,void_t<decltype(T(allocator_arg, declval<A>(),
                                                    declval<T>()))>>
     : true_type { };
           
+template <typename T, typename A, typename V>
+struct uses_prefix_allocator<T&,A,V> : uses_prefix_allocator<T,A> { };
+
 template <typename T, typename A>
 constexpr bool uses_prefix_allocator_v = uses_prefix_allocator<T,A>::value;
     
@@ -69,63 +72,92 @@ struct has_get_memory_resource<T,
 template <typename T>
 constexpr bool has_get_memory_resource_v = has_get_memory_resource<T>::value;
 
+template <typename Type, typename Alloc>
+inline
+typename enable_if< uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>, 
+                   remove_reference_t<Type>>::type
+copy_swap_helper_imp(Type&& other, const Alloc& alloc)
+{
+    typedef remove_reference_t<Type> ObjType;
+    return ObjType(allocator_arg, alloc, std::forward<Type>(other));
+}
+
+template <typename Type, typename Alloc>
+inline
+typename enable_if< uses_suffix_allocator_v<remove_reference_t<Type>,Alloc> &&
+                   !uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>,
+                   remove_reference_t<Type>>::type
+copy_swap_helper_imp(Type&& other, const Alloc& alloc)
+{
+    typedef remove_reference_t<Type> ObjType;
+    return ObjType(std::forward<Type>(other), alloc);
+}
+
+template <typename Type, typename Alloc>
+inline
+typename enable_if<!uses_suffix_allocator_v<remove_reference_t<Type>,Alloc> &&
+                   !uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>,
+                   remove_reference_t<Type>>::type
+copy_swap_helper_imp(Type&& other, const Alloc&)
+{
+    static_assert(! uses_allocator<remove_reference_t<Type>,Alloc>::value,
+                  "Type uses allocator but doesn't have appriate constructor");
+    return std::forward<Type>(other);
+}
+
 } // close internal namespace
 
-template <typename Type, typename Alloc>
+template <class T>
 inline
-typename enable_if< internal::uses_prefix_allocator_v<Type,Alloc>, Type>::type
-copy_swap_helper(allocator_arg_t, const Alloc& alloc, const Type& other)
+typename std::enable_if< internal::has_get_memory_resource_v<T>,
+                        remove_reference_t<T>>::type
+copy_swap_helper(T&& other, remove_reference_t<T> const& alloc_source)
 {
-    return Type(allocator_arg, alloc, other);
+    using internal::copy_swap_helper_imp;
+    return copy_swap_helper_imp(std::forward<T>(other),
+                                alloc_source.get_memory_resource());
 }
 
-template <typename Type, typename Alloc>
+template <class T>
 inline
-typename enable_if< internal::uses_suffix_allocator_v<Type,Alloc> &&
-                   !internal::uses_prefix_allocator_v<Type,Alloc>, Type>::type
-copy_swap_helper(allocator_arg_t, const Alloc& alloc, const Type& other)
+typename enable_if< internal::has_get_allocator_v<T> &&
+                   !internal::has_get_memory_resource_v<T>, 
+                   remove_reference_t<T>>::type
+copy_swap_helper(T&& other, remove_reference_t<T> const& alloc_source)
 {
-    return Type(other, alloc);
+    using internal::copy_swap_helper_imp;
+    return copy_swap_helper_imp(std::forward<T>(other),
+                                alloc_source.get_allocator());
 }
 
-template <typename Type, typename Alloc>
+template <class T>
 inline
-typename enable_if<!internal::uses_suffix_allocator_v<Type,Alloc> &&
-                   !internal::uses_prefix_allocator_v<Type,Alloc>, Type>::type
-copy_swap_helper(allocator_arg_t, const Alloc&, const Type& other)
+typename enable_if<!internal::has_get_allocator_v<T> &&
+                   !internal::has_get_memory_resource_v<T>,
+                   remove_reference_t<T>>::type
+copy_swap_helper(T&& other, remove_reference_t<T> const& alloc_source)
 {
-    static_assert(! uses_allocator<Type,Alloc>::value,
-                  "Type uses allocator but doesn't have appriate constructor");
-    return other;
+    return std::forward<T>(other);
 }
 
-template <class Type>
+template <class T>
 inline
-typename std::enable_if< internal::has_get_memory_resource_v<Type>, Type>::type
-copy_swap_helper(const Type& other)
+remove_reference_t<T> copy_swap_helper(T&& other)
 {
-    return copy_swap_helper(allocator_arg, other.get_memory_resource(), other);
+    return copy_swap_helper(std::forward<T>(other), other);
 }
 
-template <class Type>
+template <class T>
 inline
-typename enable_if< internal::has_get_allocator_v<Type> &&
-                   !internal::has_get_memory_resource_v<Type>, Type>::type
-copy_swap_helper(const Type& other)
+T& copy_swap(remove_reference_t<T>& lhs, T&& rhs)
 {
-    return copy_swap_helper(allocator_arg, other.get_allocator(), other);
+    using std::swap;
+    auto tmp = copy_swap_helper(std::forward<T>(rhs), lhs);
+    swap(lhs, tmp);
+    return lhs;
 }
-
-template <class Type>
-inline
-typename enable_if<!internal::has_get_allocator_v<Type> &&
-                   !internal::has_get_memory_resource_v<Type>, Type>::type
-copy_swap_helper(const Type& other)
-{
-    return other;
-}
-
-} // close fundamentals_v2
+           
+} // close fundamentals_v3
 } // close experimental
 } // close std
 

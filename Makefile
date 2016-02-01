@@ -1,16 +1,18 @@
 
 CXX = clang++
-OPT = -g
+OPT = -g -fno-inline
 CXXFLAGS = $(OPT) -std=c++14 -I.
 
-TARGETS=uses_allocator
+TARGETS=copy_swap_helper
+
+.PRECIOUS: %.t
 
 all: $(TARGETS)
 
-uses_allocator : uses_allocator.t
+% : %.t
 	./$<
 
-uses_allocator.t : uses_allocator.t.cpp uses_allocator.h
+%.t : %.t.cpp uses_allocator.h copy_swap_helper.h
 	$(CXX) $(CXXFLAGS) $< -o $@
 
 clean:
