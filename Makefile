@@ -12,7 +12,7 @@ all: $(TARGETS)
 % : %.t
 	./$<
 
-%.t : %.t.cpp uses_allocator.h copy_swap_helper.h
+%.t : %.t.cpp %.h
 	$(CXX) $(CXXFLAGS) $< -o $@
 
 clean:

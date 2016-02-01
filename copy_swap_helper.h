@@ -107,35 +107,35 @@ copy_swap_helper_imp(Type&& other, const Alloc&)
 
 } // close internal namespace
 
-template <class T>
+template <class T, class U>
 inline
-typename std::enable_if< internal::has_get_memory_resource_v<T>,
-                        remove_reference_t<T>>::type
-copy_swap_helper(T&& other, remove_reference_t<T> const& alloc_source)
+typename std::enable_if< internal::has_get_memory_resource_v<U>,
+                        remove_reference_t<U>>::type
+copy_swap_helper(T&& other, const U& alloc_source)
 {
     using internal::copy_swap_helper_imp;
     return copy_swap_helper_imp(std::forward<T>(other),
                                 alloc_source.get_memory_resource());
 }
 
-template <class T>
+template <class T, class U>
 inline
-typename enable_if< internal::has_get_allocator_v<T> &&
-                   !internal::has_get_memory_resource_v<T>, 
+typename enable_if< internal::has_get_allocator_v<U> &&
+                   !internal::has_get_memory_resource_v<U>, 
                    remove_reference_t<T>>::type
-copy_swap_helper(T&& other, remove_reference_t<T> const& alloc_source)
+copy_swap_helper(T&& other, const U& alloc_source)
 {
     using internal::copy_swap_helper_imp;
     return copy_swap_helper_imp(std::forward<T>(other),
                                 alloc_source.get_allocator());
 }
 
-template <class T>
+template <class T, class U>
 inline
-typename enable_if<!internal::has_get_allocator_v<T> &&
-                   !internal::has_get_memory_resource_v<T>,
+typename enable_if<!internal::has_get_allocator_v<U> &&
+                   !internal::has_get_memory_resource_v<U>,
                    remove_reference_t<T>>::type
-copy_swap_helper(T&& other, remove_reference_t<T> const& alloc_source)
+copy_swap_helper(T&& other, const U& /* alloc_source */)
 {
     return std::forward<T>(other);
 }
@@ -149,7 +149,8 @@ remove_reference_t<T> copy_swap_helper(T&& other)
 
 template <class T>
 inline
-T& copy_swap(remove_reference_t<T>& lhs, T&& rhs)
+remove_const_t<remove_reference_t<T>>& 
+copy_swap(remove_const_t<remove_reference_t<T>>& lhs, T&& rhs)
 {
     using std::swap;
     auto tmp = copy_swap_helper(std::forward<T>(rhs), lhs);

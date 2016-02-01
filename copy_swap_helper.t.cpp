@@ -257,9 +257,9 @@ int main()
         TEST_ASSERT(3 == cc.value());
         Obj y(copy_swap_helper(x));
         TEST_ASSERT(y == x);
-        Obj q(9);
-        Obj z(copy_swap_helper(x, q));
+        Obj z(copy_swap_helper(x, TestType<IntAlloc>(A1)));
         TEST_ASSERT(z == x);
+        const Obj q(9);
         Obj& yr = copy_swap(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
@@ -288,7 +288,7 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj q(9, A2);
+        const Obj q(9, A2);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
@@ -322,7 +322,7 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj q(9, pR2);
+        const Obj q(9, pR2);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(pR2 == z.get_memory_resource());
@@ -356,7 +356,7 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj q(9, A2);
+        const Obj q(9, A2);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(R2 == *z.get_memory_resource());
@@ -390,7 +390,7 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj q(std::allocator_arg, A2, 9);
+        const Obj q(std::allocator_arg, A2, 9);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
@@ -424,7 +424,7 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj q(std::allocator_arg, pR2, 9);
+        const Obj q(std::allocator_arg, pR2, 9);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(pR2 == z.get_memory_resource());
@@ -458,7 +458,7 @@ int main()
         TEST_ASSERT(y == x);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj q(std::allocator_arg, A2, 9);
+        const Obj q(std::allocator_arg, A2, 9);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(R2 == *z.get_memory_resource());
