@@ -149,15 +149,65 @@ remove_reference_t<T> copy_swap_helper(T&& other)
 
 template <class T>
 inline
-remove_const_t<remove_reference_t<T>>& 
-copy_swap(remove_const_t<remove_reference_t<T>>& lhs, T&& rhs)
+typename enable_if< internal::has_get_allocator_v<T> &&
+                   !internal::has_get_memory_resource_v<T>, 
+                   T&>::type
+copy_swap(T& lhs, common_type_t<T>&& rhs)
 {
+    using internal::copy_swap_helper_imp;
+    typedef decltype(lhs.get_allocator()) Alloc;
+    constexpr bool pocma =
+        allocator_traits<Alloc>::propagate_on_container_move_assignment::value;
+    T R = (pocma ? T(std::move(rhs)) :
+           copy_swap_helper_imp(std::move(rhs), lhs.get_allocator()));
     using std::swap;
-    auto tmp = copy_swap_helper(std::forward<T>(rhs), lhs);
-    swap(lhs, tmp);
+    swap(lhs, R);
     return lhs;
 }
            
+template <class T>
+inline
+typename enable_if<!internal::has_get_allocator_v<T> ||
+                    internal::has_get_memory_resource_v<T>,
+                   T&>::type
+copy_swap(T& lhs, common_type_t<T>&& rhs)
+{
+    T R = copy_swap_helper(std::move(rhs), lhs);
+    using std::swap;
+    swap(lhs, R);
+    return lhs;
+}
+           
+template <class T>
+inline
+typename enable_if< internal::has_get_allocator_v<T> &&
+                   !internal::has_get_memory_resource_v<T>, 
+                   T&>::type
+copy_swap(T& lhs, common_type_t<T> const& rhs)
+{
+    using internal::copy_swap_helper_imp;
+    typedef decltype(lhs.get_allocator()) Alloc;
+    constexpr bool pocca =
+        allocator_traits<Alloc>::propagate_on_container_copy_assignment::value;
+    T R = copy_swap_helper_imp(rhs, (pocca ? rhs : lhs).get_allocator());
+    using std::swap;
+    swap(lhs, R);
+    return lhs;
+}
+
+template <class T>
+inline
+typename enable_if<!internal::has_get_allocator_v<T> ||
+                    internal::has_get_memory_resource_v<T>,
+                   T&>::type
+copy_swap(T& lhs, common_type_t<T> const& rhs)
+{
+    T R = copy_swap_helper(rhs, lhs);
+    using std::swap;
+    swap(lhs, R);
+    return lhs;
+}
+
 } // close fundamentals_v3
 } // close experimental
 } // close std

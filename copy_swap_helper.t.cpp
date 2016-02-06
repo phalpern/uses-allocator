@@ -40,14 +40,24 @@ bool operator!=(const memory_resource& a, const memory_resource& b)
 using namespace std::experimental::fundamentals_v3::internal;
 namespace pmr = std::experimental::pmr;
 
-// STL-style test allocator (doesn't meet the Allocator requirements, but
-// that's not important for this test).
+// STL-style test allocator (doesn't actually allocate memory, but that's not
+// important for this test).
 template <class T>
 class MySTLAlloc
 {
     int m_id;
 public:
+    typedef T value_type;
+
     explicit MySTLAlloc(int id = -1) : m_id(id) { }
+
+    T* allocate(std::size_t) { throw std::bad_alloc(); }
+    void deallocate(T*, std::size_t) { }
+    
+    // Don't propagate on copy construction
+    MySTLAlloc select_on_container_copy_construction() const {
+        return MySTLAlloc();
+    }
 
     int id() const { return m_id; }
 };
@@ -60,6 +70,46 @@ inline bool operator==(const MySTLAlloc<T>& a, const MySTLAlloc<T>& b)
 
 template <class T>
 inline bool operator!=(const MySTLAlloc<T>& a, const MySTLAlloc<T>& b)
+{
+    return a.id() != b.id();
+}
+
+// STL-style test allocator that propagates on container move, copy, and swap
+// (doesn't actually allocate memory, but that's not important for this test).
+template <class T>
+class MyPocAlloc
+{
+    int m_id;
+public:
+    typedef T value_type;
+
+    explicit MyPocAlloc(int id = -1) : m_id(id) { }
+
+    T* allocate(std::size_t) { throw std::bad_alloc(); }
+    void deallocate(T*, std::size_t) { }
+
+    // Propagate on copy construction
+    const MyPocAlloc& select_on_container_copy_construction() const {
+        return *this;
+    }
+
+    // Propagate on move assignment, copy assignment, and swap.
+    // For any reasonable allocator, these three traits will be the same:
+    typedef std::true_type propagate_on_container_move_assignment;
+    typedef std::true_type propagate_on_container_copy_assignment;
+    typedef std::true_type propagate_on_container_swap;
+
+    int id() const { return m_id; }
+};
+
+template <class T>
+inline bool operator==(const MyPocAlloc<T>& a, const MyPocAlloc<T>& b)
+{
+    return a.id() == b.id();
+}
+
+template <class T>
+inline bool operator!=(const MyPocAlloc<T>& a, const MyPocAlloc<T>& b)
 {
     return a.id() != b.id();
 }
@@ -91,15 +141,32 @@ class NoAlloc
 {
 };
 
-template <typename Alloc> 
+template <typename Alloc>
 class TestTypeBase {
 protected:
-    typedef Alloc AllocType;
-    AllocType m_alloc;
+    typedef Alloc AllocType; // Used in derived class
+    typedef std::allocator_traits<Alloc> AT;
+    Alloc m_alloc;
     TestTypeBase() : m_alloc() { }
-    TestTypeBase(const AllocType& a) : m_alloc(a) { }
+    TestTypeBase(const Alloc& a) : m_alloc(a) { }
+    TestTypeBase(const TestTypeBase& other)
+        : m_alloc(AT::select_on_container_copy_construction(other.m_alloc)) { }
+    TestTypeBase(TestTypeBase&& other) : m_alloc(other.m_alloc) { }
+    void operator=(const TestTypeBase& other) {
+        if (AT::propagate_on_container_copy_assignment::value)
+            m_alloc = other.m_alloc;
+    }
+    void operator=(TestTypeBase&& other) {
+        if (AT::propagate_on_container_move_assignment::value)
+            m_alloc = other.m_alloc;
+    }
+    void swap(TestTypeBase& other) {
+        using std::swap;
+        if (AT::propagate_on_container_swap::value)
+            swap(m_alloc, other.m_alloc);
+    }
 public:
-    typedef AllocType allocator_type;
+    typedef Alloc allocator_type;
     Alloc get_allocator() const { return m_alloc; }
 };
 
@@ -110,6 +177,7 @@ protected:
     typedef NoAlloc AllocType;
     TestTypeBase() { }
     TestTypeBase(const AllocType&) { }
+    void swap(TestTypeBase& other) { }
 };
 
 template <> 
@@ -121,6 +189,10 @@ protected:
     TestTypeBase() : m_alloc(&DefaultResource) { }
     TestTypeBase(const AllocType& a) : m_alloc(a) { }
     TestTypeBase(const TestTypeBase& other) : m_alloc(&DefaultResource) { }
+    TestTypeBase(TestTypeBase&& other) : m_alloc(other.m_alloc) { }
+    void operator=(const TestTypeBase& other) { }
+    void operator=(TestTypeBase&& other) { }
+    void swap(TestTypeBase& other) { }
 public:
     typedef AllocType allocator_type;
     AllocType get_memory_resource() const { return m_alloc; }
@@ -154,6 +226,11 @@ protected:
     AllocType m_alloc;
     TestTypeBase() : m_alloc() { }
     TestTypeBase(const AllocType& a) : m_alloc(a) { }
+    TestTypeBase(const TestTypeBase& other) : m_alloc() { }
+    TestTypeBase(TestTypeBase&& other) : m_alloc(other.m_alloc) { }
+    void operator=(const TestTypeBase& other) { }
+    void operator=(TestTypeBase&& other) { }
+    void swap(TestTypeBase& other) { }
 
 public:
     typedef AllocType allocator_type;
@@ -196,13 +273,25 @@ public:
     TestType(int v, const SuffixAlloc& a) 
         : Base(a), m_value(v) { }
 
-    TestType(const TestType& other) : Base(), m_value(other.m_value) { }
+    TestType(const TestType& other) : Base(other), m_value(other.m_value) { }
     TestType(std::allocator_arg_t, const PrefixAlloc& a, const TestType& other)
         : Base(a), m_value(other.m_value) { }
     TestType(const TestType& other, const SuffixAlloc& a) 
         : Base(a), m_value(other.m_value) { }
 
+    TestType(TestType&& other) 
+        : Base(std::move(other)), m_value(other.m_value) { other.m_value = -1; }
+    TestType(std::allocator_arg_t, const PrefixAlloc& a, TestType&& other)
+        : Base(a), m_value(other.m_value) { other.m_value = -1; }
+    TestType(TestType&& other, const SuffixAlloc& a) 
+        : Base(a), m_value(other.m_value) { other.m_value = -1; }
+
     ~TestType() { }
+
+    void swap(TestType& other) {
+        this->Base::swap(other);
+        std::swap(m_value, other.m_value);
+    }
 
     int value() const { return m_value; }
 };
@@ -219,6 +308,12 @@ bool operator!=(const TestType<Alloc, Prefix>& a,
                 const TestType<Alloc, Prefix>& b)
 {
     return a.value() != b.value();
+}
+
+template <typename Alloc, bool Prefix = false>
+void swap(TestType<Alloc, Prefix>& a, TestType<Alloc, Prefix>& b)
+{
+    a.swap(b);
 }
 
 static int errorCount = 0;
@@ -263,6 +358,9 @@ int main()
         Obj& yr = copy_swap(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
+        Obj& zr = copy_swap(z, Obj(8));
+        TEST_ASSERT(&zr == &z);
+        TEST_ASSERT(z == Obj(8));
     }
     
     {
@@ -297,6 +395,11 @@ int main()
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(A1 == y.get_allocator());
+
+        Obj& zr = copy_swap(z, Obj(8, A1));
+        TEST_ASSERT(&zr == &z);
+        TEST_ASSERT(z.value() == 8);
+        TEST_ASSERT(A2 == z.get_allocator());
     }
     
     {
@@ -331,6 +434,11 @@ int main()
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(pR1 == y.get_memory_resource());
+
+        Obj& zr = copy_swap(z, Obj(8, pR1));
+        TEST_ASSERT(&zr == &z);
+        TEST_ASSERT(z.value() == 8);
+        TEST_ASSERT(pR2 == z.get_memory_resource());
     }
     
     {
@@ -365,6 +473,11 @@ int main()
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(R1 == *y.get_memory_resource());
+
+        Obj& zr = copy_swap(z, Obj(8, A1));
+        TEST_ASSERT(&zr == &z);
+        TEST_ASSERT(z.value() == 8);
+        TEST_ASSERT(R2 == *z.get_memory_resource());
     }
     
     {
@@ -399,6 +512,11 @@ int main()
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(A1 == y.get_allocator());
+
+        Obj& zr = copy_swap(z, Obj(std::allocator_arg, A1, 8));
+        TEST_ASSERT(&zr == &z);
+        TEST_ASSERT(z.value() == 8);
+        TEST_ASSERT(A2 == z.get_allocator());
     }
     
     {
@@ -432,7 +550,12 @@ int main()
         Obj& yr = copy_swap(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
-        TEST_ASSERT(R1 == *y.get_memory_resource());
+        TEST_ASSERT(pR1 == y.get_memory_resource());
+
+        Obj& zr = copy_swap(z, Obj(std::allocator_arg, pR1, 8));
+        TEST_ASSERT(&zr == &z);
+        TEST_ASSERT(z.value() == 8);
+        TEST_ASSERT(pR2 == z.get_memory_resource());
     }
     
     {
@@ -467,6 +590,44 @@ int main()
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(R1 == *y.get_memory_resource());
+
+        Obj& zr = copy_swap(z, Obj(std::allocator_arg, A1, 8));
+        TEST_ASSERT(&zr == &z);
+        TEST_ASSERT(z.value() == 8);
+        TEST_ASSERT(R2 == *z.get_memory_resource());
     }
-    
+
+    // Test propagating allocator with `copy_swap`
+    {
+        typedef MyPocAlloc<int> IntPocAlloc;
+        typedef TestType<IntPocAlloc> Obj;
+
+        TEST_ASSERT(  has_get_allocator_v<Obj>);
+        TEST_ASSERT(! has_get_memory_resource_v<Obj>);
+        TEST_ASSERT(  (uses_suffix_allocator_v<Obj, IntPocAlloc>));
+        TEST_ASSERT(! (uses_prefix_allocator_v<Obj, IntPocAlloc>));
+
+        IntPocAlloc PA0;
+        IntPocAlloc PA1(1);
+        IntPocAlloc PA2(2);
+
+        Obj x(3, PA1);
+        TEST_ASSERT(3 == x.value());
+        TEST_ASSERT(PA1 == x.get_allocator());
+
+        Obj y(4, PA2);
+        TEST_ASSERT(4 == y.value());
+        TEST_ASSERT(PA2 == y.get_allocator());
+
+        Obj q(9, PA2);
+        Obj &rx = copy_swap(x, q);
+        TEST_ASSERT(&rx == &x);
+        TEST_ASSERT(x == q);
+        TEST_ASSERT(PA2 == x.get_allocator());
+
+        Obj &ry = copy_swap(y, Obj(8, PA1));
+        TEST_ASSERT(&ry == &y);
+        TEST_ASSERT(y.value() == 8);
+        TEST_ASSERT(PA1 == y.get_allocator());
+    }
 }
