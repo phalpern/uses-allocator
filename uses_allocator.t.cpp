@@ -361,46 +361,6 @@ void runTest()
     TEST_ASSERT(usesAlloc   == (exp::uses_allocator<Obj, CharAlloc>::value));
     TEST_ASSERT(usesMemRsrc == (exp::uses_allocator<Obj, pmr_ptr>::value));
 
-    // Test with no constructor arguments
-    {
-        auto args = std::tuple<>();
-        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
-        const std::size_t expNumArgs = 0;
-        TEST_ASSERT(expNumArgs == numArgs);
-
-        Obj V = exp::make_from_tuple<Obj>(args);
-        TEST_ASSERT(0 == V.value());
-        TEST_ASSERT(usesAlloc == V.match_allocator(A0));
-        TEST_ASSERT(usesMemRsrc == V.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(0 == pW->value());
-        TEST_ASSERT(usesAlloc == pW->match_allocator(A0));
-        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR0));
-        pW->~Obj();
-    }
-
-    // Test with value.
-    {
-        auto args = std::tuple<int&&>(std::move(val));
-        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
-        const std::size_t expNumArgs = 1;
-        const std::size_t valArg = 0;
-        TEST_ASSERT(expNumArgs == numArgs);
-        TEST_ASSERT((match_tuple_element<valArg, int&&>(args, val)));
-
-        Obj V = exp::make_from_tuple<Obj>(args);
-        TEST_ASSERT(val == V.value());
-        TEST_ASSERT(usesAlloc == V.match_allocator(A0));
-        TEST_ASSERT(usesMemRsrc == V.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(val == pW->value());
-        TEST_ASSERT(usesAlloc == pW->match_allocator(A0));
-        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR0));
-        pW->~Obj();
-    }
-
     // Test with allocator
     {
         auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1);
