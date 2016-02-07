@@ -1,4 +1,8 @@
-// copy_swap_helper.t.cpp                  -*-C++-*-
+/* copy_swap_helper.t.cpp                  -*-C++-*-
+ *
+ * Copyright (C) 2016 Pablo Halpern <phalpern@halpernwightsoftware.com>
+ * Distributed under the Boost Software License - Version 1.0
+ */
 
 #include <copy_swap_helper.h>
 

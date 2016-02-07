@@ -1,6 +1,7 @@
 /* copy_swap_helper.h                  -*-C++-*-
  *
- * Pablo Halpern, February 2016
+ * Copyright (C) 2016 Pablo Halpern <phalpern@halpernwightsoftware.com>
+ * Distributed under the Boost Software License - Version 1.0
  *
  * Implementation of P0208 Copy-Swap Helper
  */

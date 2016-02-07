@@ -1,6 +1,7 @@
 /* uses_allocator.h                  -*-C++-*-
  *
- * Pablo Halpern, 2016
+ * Copyright (C) 2016 Pablo Halpern <phalpern@halpernwightsoftware.com>
+ * Distributed under the Boost Software License - Version 1.0
  */
 
 #ifndef INCLUDED_USES_ALLOCATOR_DOT_H
