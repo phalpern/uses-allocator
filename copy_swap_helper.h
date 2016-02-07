@@ -1,10 +1,15 @@
 /* copy_swap_helper.h                  -*-C++-*-
  *
- * Pablo Halpern, January 2016
+ * Pablo Halpern, February 2016
+ *
+ * Implementation of P0208 Copy-Swap Helper
  */
 
 #ifndef INCLUDED_COPY_SWAP_HELPER_DOT_H
 #define INCLUDED_COPY_SWAP_HELPER_DOT_H
+
+// Feature-test macro
+#define __cpp_lib_experimental_copy_swap_helper 201602
 
 #include <utility>
 #include <memory>
