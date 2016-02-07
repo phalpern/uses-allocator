@@ -7,18 +7,10 @@
 #ifndef INCLUDED_USES_ALLOCATOR_DOT_H
 #define INCLUDED_USES_ALLOCATOR_DOT_H
 
-#include <utility>
+#include <make_from_tuple.h>
 #include <memory>
-#include <cstdlib>
 
 namespace std {
-
-inline namespace cpp17 {
-
-template <class...> struct void_t_imp { typedef void type; };
-template <class... T> using void_t = typename void_t_imp<T...>::type;
-
-} // close cpp17
 
 namespace experimental {
 inline namespace fundamentals_v2 {
@@ -47,6 +39,10 @@ bool operator!=(const memory_resource& a, const memory_resource& b)
 }
 
 } // close namespace pmr
+} // close namespace fundamentals_v2
+
+
+inline namespace fundamentals_v3 {
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -207,35 +203,6 @@ auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
                                                             forward<U2>(arg2)));
 }
 
-template <class T, class... Args, size_t... Indexes>
-T make_from_tuple_imp(const tuple<Args...>& tuple_args,
-                      index_sequence<Indexes...>)
-{
-    return T(get<Indexes>(tuple_args)...);
-}
-
-template <class T, class... Args, size_t... Indexes>
-T make_from_tuple_imp(tuple<Args...>&& tuple_args,
-                      index_sequence<Indexes...>)
-{
-    return T(forward<Args>(get<Indexes>(tuple_args))...);
-}
-
-template <class T, class... Args, size_t... Indexes>
-T* uninitialized_construct_from_tuple_imp(T* p,
-                                          const tuple<Args...>& args_tuple,
-                                          index_sequence<Indexes...>)
-{
-    return ::new((void*) p) T(get<Indexes>(args_tuple)...);
-}
-    
-template <class T, class... Args, size_t... Indexes>
-T* uninitialized_construct_from_tuple_imp(T* p,
-                                          tuple<Args...>&& args_tuple,
-                                          index_sequence<Indexes...>)
-{
-    return ::new((void*) p) T(forward<Args>(get<Indexes>(args_tuple))...);
-}
     
 } // close namespace internal
 
@@ -253,38 +220,6 @@ auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
                                                           Alloc, Args...>(),
                                          allocator_arg, a,
                                          std::forward<Args>(args)...);
-}
-
-template <class T, class... Args>
-T make_from_tuple(const tuple<Args...>& args_tuple)
-{
-    using namespace internal;
-    return make_from_tuple_imp<T>(args_tuple, 
-                                  make_index_sequence<sizeof...(Args)>());
-}
-
-template <class T, class... Args>
-T make_from_tuple(tuple<Args...>&& args_tuple)
-{
-    using namespace internal;
-    return make_from_tuple_imp<T>(std::move(args_tuple), 
-                                  make_index_sequence<sizeof...(Args)>());
-}
-
-template <class T, class... Args>
-T* uninitialized_construct_from_tuple(T* p, const tuple<Args...>& args_tuple)
-{
-    using namespace internal;
-    return uninitialized_construct_from_tuple_imp<T>(p, args_tuple, 
-                                       make_index_sequence<sizeof...(Args)>());
-}
-
-template <class T, class... Args>
-T* uninitialized_construct_from_tuple(T* p, tuple<Args...>&& args_tuple)
-{
-    using namespace internal;
-    return uninitialized_construct_from_tuple_imp<T>(p, std::move(args_tuple), 
-                                       make_index_sequence<sizeof...(Args)>());
 }
 
 template <class T, class Alloc, class... Args>
@@ -307,7 +242,7 @@ T* uninitialized_construct_using_allocator(T* p,
                                        forward<Args>(args)...));
 }
 
-} // close namespace fundamentals_v2
+} // close namespace fundamentals_v3
 } // close namespace experimental
 } // close namespace std
 

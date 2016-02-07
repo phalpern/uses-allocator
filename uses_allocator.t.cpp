@@ -12,7 +12,7 @@
 
 namespace exp = std::experimental;
 namespace pmr = exp::pmr;
-namespace internal = exp::fundamentals_v2::internal;
+namespace internal = exp::fundamentals_v3::internal;
 
 // STL-style test allocator (doesn't meet the Allocator requirements, but
 // that's not important for this test).
