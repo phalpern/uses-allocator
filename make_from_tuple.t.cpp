@@ -92,32 +92,41 @@ int main()
     TEST((tuple<>{}                                 ), ( 0, 0.0, ""       ));
     TEST((tuple<int>{1}                             ), ( 1, 0.0, ""       ));
     TEST((tuple<int,float>{1, 2}                    ), ( 1, 2.0, ""       ));
-    TEST((tuple<int,double,string>{1,2,"hello"}     ), ( 1, 2.0, "hello"  ));
-    TEST((tuple<int,double,const char*>{1,2,"hello"}), ( 1, 2.0, "hello"  ));
+    TEST((tuple<int,double,string>{1,2,"three"}     ), ( 1, 2.0, "three"  ));
+    TEST((tuple<int,double,const char*>{1,2,"three"}), ( 1, 2.0, "three"  ));
+    TEST((tuple<TT>(TT{ 4, 5, "six" }))              , ( 4, 5.0, "six"    ));
+    TEST((std::pair<int,int>(4, 5))                  , ( 4, 5.0, ""       ));
 
-    // Test using `forward_as_tuple`, which cannot be copy-constructed
+    // Test using `forward_as_tuple`, which produces a tuple that cannot be
+    // copy-constructed because it contains rvalue references.
     {
-        std::string hello("hello");
+        std::string three("three");
 
-        TT exp{ 1, 2, "hello" };
+        TT exp{ 1, 2, "three" };
 
         TT Obj = exp::make_from_tuple<TT>(
-            std::forward_as_tuple(1, 2, std::move(hello)));
+            std::forward_as_tuple(1, 2, std::move(three)));
         TEST_ASSERT(exp == Obj);
+        // Move-construction will leave moved-from string empty in
+        // any reasonable implementation.
+        TEST_ASSERT(three.empty());
     }
 
     {
-        std::string hello("hello");
+        std::string three("three");
 
-        TT exp{ 1, 2, "hello" };
+        TT exp{ 1, 2, "three" };
 
         char ObjBuf alignas(TT) [sizeof(TT)];
 
         // Test uninitialized_construct_from_tuple with rvalue
         TT *pObj = reinterpret_cast<TT*>(ObjBuf);
         exp::uninitialized_construct_from_tuple(pObj,
-                                std::forward_as_tuple(1, 2, std::move(hello)));
+                                std::forward_as_tuple(1, 2, std::move(three)));
         TEST_ASSERT(exp == *pObj);
+        // Move-construction will leave moved-from string empty in
+        // any reasonable implementation.
+        TEST_ASSERT(three.empty());
         pObj->~TT();
     }
     

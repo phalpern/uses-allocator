@@ -24,68 +24,37 @@ inline namespace fundamentals_v3 {
 
 namespace internal {
 
-template <class T, class... Args, size_t... Indexes>
-T make_from_tuple_imp(const tuple<Args...>& tuple_args,
-                      index_sequence<Indexes...>)
+template <class T, class Tuple, size_t... Indexes>
+T make_from_tuple_imp(Tuple&& t, index_sequence<Indexes...>)
 {
-    return T(get<Indexes>(tuple_args)...);
+    return T(get<Indexes>(forward<Tuple>(t))...);
 }
 
-template <class T, class... Args, size_t... Indexes>
-T make_from_tuple_imp(tuple<Args...>&& tuple_args,
-                      index_sequence<Indexes...>)
-{
-    return T(forward<Args>(get<Indexes>(tuple_args))...);
-}
-
-template <class T, class... Args, size_t... Indexes>
-T* uninitialized_construct_from_tuple_imp(T* p,
-                                          const tuple<Args...>& args_tuple,
+template <class T, class Tuple, size_t... Indexes>
+T* uninitialized_construct_from_tuple_imp(T* p, Tuple&& t,
                                           index_sequence<Indexes...>)
 {
-    return ::new((void*) p) T(get<Indexes>(args_tuple)...);
-}
-    
-template <class T, class... Args, size_t... Indexes>
-T* uninitialized_construct_from_tuple_imp(T* p,
-                                          tuple<Args...>&& args_tuple,
-                                          index_sequence<Indexes...>)
-{
-    return ::new((void*) p) T(forward<Args>(get<Indexes>(args_tuple))...);
+    return ::new((void*) p) T(get<Indexes>(std::forward<Tuple>(t))...);
 }
 
 } // close namespace namespace fundamentals_v3::internal
 
-template <class T, class... Args>
-T make_from_tuple(const tuple<Args...>& args_tuple)
+template <class T, class Tuple>
+T make_from_tuple(Tuple&& args_tuple)
 {
     using namespace internal;
-    return make_from_tuple_imp<T>(args_tuple, 
-                                  make_index_sequence<sizeof...(Args)>());
+    using Indices = make_index_sequence<tuple_size<decay_t<Tuple>>::value>;
+    return make_from_tuple_imp<T>(forward<Tuple>(args_tuple), Indices{});
 }
 
-template <class T, class... Args>
-T make_from_tuple(tuple<Args...>&& args_tuple)
+template <class T, class Tuple>
+T* uninitialized_construct_from_tuple(T* p, Tuple&& args_tuple)
 {
     using namespace internal;
-    return make_from_tuple_imp<T>(std::move(args_tuple), 
-                                  make_index_sequence<sizeof...(Args)>());
-}
-
-template <class T, class... Args>
-T* uninitialized_construct_from_tuple(T* p, const tuple<Args...>& args_tuple)
-{
-    using namespace internal;
-    return uninitialized_construct_from_tuple_imp<T>(p, args_tuple, 
-                                       make_index_sequence<sizeof...(Args)>());
-}
-
-template <class T, class... Args>
-T* uninitialized_construct_from_tuple(T* p, tuple<Args...>&& args_tuple)
-{
-    using namespace internal;
-    return uninitialized_construct_from_tuple_imp<T>(p, std::move(args_tuple), 
-                                       make_index_sequence<sizeof...(Args)>());
+    using Indices = make_index_sequence<tuple_size<decay_t<Tuple>>::value>;
+    return uninitialized_construct_from_tuple_imp<T>(p,
+                                                     forward<Tuple>(args_tuple),
+                                                     Indices{});
 }
 
 } // close namespace fundamentals_v3
