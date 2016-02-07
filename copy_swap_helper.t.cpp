@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib>
+#include <cassert>
 
 namespace std {
 namespace experimental {
@@ -160,10 +161,12 @@ protected:
         if (AT::propagate_on_container_move_assignment::value)
             m_alloc = other.m_alloc;
     }
-    void swap(TestTypeBase& other) {
+    void swap(TestTypeBase& other) noexcept {
         using std::swap;
         if (AT::propagate_on_container_swap::value)
             swap(m_alloc, other.m_alloc);
+        else
+            assert(m_alloc == other.m_alloc);
     }
 public:
     typedef Alloc allocator_type;
@@ -177,7 +180,7 @@ protected:
     typedef NoAlloc AllocType;
     TestTypeBase() { }
     TestTypeBase(const AllocType&) { }
-    void swap(TestTypeBase& other) { }
+    void swap(TestTypeBase& other) noexcept { }
 };
 
 template <> 
@@ -192,7 +195,8 @@ protected:
     TestTypeBase(TestTypeBase&& other) : m_alloc(other.m_alloc) { }
     void operator=(const TestTypeBase& other) { }
     void operator=(TestTypeBase&& other) { }
-    void swap(TestTypeBase& other) { }
+    void swap(TestTypeBase& other) noexcept 
+        { assert(m_alloc == other.m_alloc); }
 public:
     typedef AllocType allocator_type;
     AllocType get_memory_resource() const { return m_alloc; }
@@ -230,7 +234,8 @@ protected:
     TestTypeBase(TestTypeBase&& other) : m_alloc(other.m_alloc) { }
     void operator=(const TestTypeBase& other) { }
     void operator=(TestTypeBase&& other) { }
-    void swap(TestTypeBase& other) { }
+    void swap(TestTypeBase& other) noexcept
+        { assert(*m_alloc.m_resource_p == *other.m_alloc.m_resource_p); }
 
 public:
     typedef AllocType allocator_type;
@@ -288,7 +293,7 @@ public:
 
     ~TestType() { }
 
-    void swap(TestType& other) {
+    void swap(TestType& other) noexcept {
         this->Base::swap(other);
         std::swap(m_value, other.m_value);
     }
@@ -311,7 +316,7 @@ bool operator!=(const TestType<Alloc, Prefix>& a,
 }
 
 template <typename Alloc, bool Prefix = false>
-void swap(TestType<Alloc, Prefix>& a, TestType<Alloc, Prefix>& b)
+void swap(TestType<Alloc, Prefix>& a, TestType<Alloc, Prefix>& b) noexcept
 {
     a.swap(b);
 }
