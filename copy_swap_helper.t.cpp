@@ -328,8 +328,7 @@ static int errorCount = 0;
 int main()
 {
     using std::experimental::copy_swap_helper;
-    using std::experimental::copy_swap;
-    using std::experimental::move_swap;
+    using std::experimental::swap_assign;
 
     typedef MySTLAlloc<int> IntAlloc;
     typedef pmr::memory_resource* pmr_ptr;
@@ -356,10 +355,10 @@ int main()
         Obj z(copy_swap_helper(x, TestType<IntAlloc>(A1)));
         TEST_ASSERT(z == x);
         const Obj q(9);
-        Obj& yr = copy_swap(y, q);
+        Obj& yr = swap_assign(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
-        Obj& zr = move_swap(z, Obj(8));
+        Obj& zr = swap_assign(z, Obj(8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z == Obj(8));
     }
@@ -392,12 +391,12 @@ int main()
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
 
-        Obj& yr = copy_swap(y, q);
+        Obj& yr = swap_assign(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj& zr = move_swap(z, Obj(8, A1));
+        Obj& zr = swap_assign(z, Obj(8, A1));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(A2 == z.get_allocator());
@@ -431,12 +430,12 @@ int main()
         TEST_ASSERT(z == x);
         TEST_ASSERT(pR2 == z.get_memory_resource());
 
-        Obj& yr = copy_swap(y, q);
+        Obj& yr = swap_assign(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj& zr = move_swap(z, Obj(8, pR1));
+        Obj& zr = swap_assign(z, Obj(8, pR1));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(pR2 == z.get_memory_resource());
@@ -470,12 +469,12 @@ int main()
         TEST_ASSERT(z == x);
         TEST_ASSERT(R2 == *z.get_memory_resource());
 
-        Obj& yr = copy_swap(y, q);
+        Obj& yr = swap_assign(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj& zr = move_swap(z, Obj(8, A1));
+        Obj& zr = swap_assign(z, Obj(8, A1));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(R2 == *z.get_memory_resource());
@@ -509,12 +508,12 @@ int main()
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
 
-        Obj& yr = copy_swap(y, q);
+        Obj& yr = swap_assign(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj& zr = move_swap(z, Obj(std::allocator_arg, A1, 8));
+        Obj& zr = swap_assign(z, Obj(std::allocator_arg, A1, 8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(A2 == z.get_allocator());
@@ -548,12 +547,12 @@ int main()
         TEST_ASSERT(z == x);
         TEST_ASSERT(pR2 == z.get_memory_resource());
 
-        Obj& yr = copy_swap(y, q);
+        Obj& yr = swap_assign(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj& zr = move_swap(z, Obj(std::allocator_arg, pR1, 8));
+        Obj& zr = swap_assign(z, Obj(std::allocator_arg, pR1, 8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(pR2 == z.get_memory_resource());
@@ -587,12 +586,12 @@ int main()
         TEST_ASSERT(z == x);
         TEST_ASSERT(R2 == *z.get_memory_resource());
 
-        Obj& yr = copy_swap(y, q);
+        Obj& yr = swap_assign(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj& zr = move_swap(z, Obj(std::allocator_arg, A1, 8));
+        Obj& zr = swap_assign(z, Obj(std::allocator_arg, A1, 8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(R2 == *z.get_memory_resource());
@@ -621,12 +620,12 @@ int main()
         TEST_ASSERT(PA2 == y.get_allocator());
 
         Obj q(9, PA2);
-        Obj &rx = copy_swap(x, q);
+        Obj &rx = swap_assign(x, q);
         TEST_ASSERT(&rx == &x);
         TEST_ASSERT(x == q);
         TEST_ASSERT(PA2 == x.get_allocator());
 
-        Obj &ry = move_swap(y, Obj(8, PA1));
+        Obj &ry = swap_assign(y, Obj(8, PA1));
         TEST_ASSERT(&ry == &y);
         TEST_ASSERT(y.value() == 8);
         TEST_ASSERT(PA1 == y.get_allocator());

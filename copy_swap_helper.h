@@ -152,7 +152,7 @@ inline
 typename enable_if< internal::has_get_allocator_v<T> &&
                    !internal::has_get_memory_resource_v<T>, 
                    T&>::type
-move_swap(T& lhs, common_type_t<T>&& rhs)
+swap_assign(T& lhs, common_type_t<T>&& rhs)
 {
     using internal::copy_swap_helper_imp;
     typedef decltype(lhs.get_allocator()) Alloc;
@@ -170,7 +170,7 @@ inline
 typename enable_if<!internal::has_get_allocator_v<T> ||
                     internal::has_get_memory_resource_v<T>,
                    T&>::type
-move_swap(T& lhs, common_type_t<T>&& rhs)
+swap_assign(T& lhs, common_type_t<T>&& rhs)
 {
     T R = copy_swap_helper(std::move(rhs), lhs);
     using std::swap;
@@ -183,7 +183,7 @@ inline
 typename enable_if< internal::has_get_allocator_v<T> &&
                    !internal::has_get_memory_resource_v<T>, 
                    T&>::type
-copy_swap(T& lhs, common_type_t<T> const& rhs)
+swap_assign(T& lhs, common_type_t<T> const& rhs)
 {
     using internal::copy_swap_helper_imp;
     typedef decltype(lhs.get_allocator()) Alloc;
@@ -200,7 +200,7 @@ inline
 typename enable_if<!internal::has_get_allocator_v<T> ||
                     internal::has_get_memory_resource_v<T>,
                    T&>::type
-copy_swap(T& lhs, common_type_t<T> const& rhs)
+swap_assign(T& lhs, common_type_t<T> const& rhs)
 {
     T R = copy_swap_helper(rhs, lhs);
     using std::swap;
