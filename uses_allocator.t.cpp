@@ -6,9 +6,9 @@
 
 #include "uses_allocator.h"
 
-#include <iostream>
 #include <vector>
 #include <cstdlib>
+#include <test_assert.h>
 
 namespace exp = std::experimental;
 namespace pmr = exp::pmr;
@@ -217,38 +217,6 @@ bool operator!=(const TestType<Alloc, Prefix>& a,
 {
     return a.value() != b.value();
 }
-
-static int errorCount = 0;
-class TestContext
-{
-    const TestContext* m_prevContext;
-    const char*        m_str;
-    static const TestContext* s_currContext;
-
-public:
-    static const TestContext* currContext() { return s_currContext; }
-    
-    TestContext(const char* str) : m_prevContext(s_currContext), m_str(str) {
-        s_currContext = this;
-    }
-        
-    ~TestContext() { s_currContext = m_prevContext; }
-
-    const TestContext* prevContext() const { return m_prevContext; }
-    const char* str() const { return m_str; }
-};
-const TestContext *TestContext::s_currContext = nullptr;
-
-#define TEST_ASSERT(c) do {                                             \
-        if (! (c)) {                                                    \
-            std::cout << __FILE__ << ':' << __LINE__                    \
-                      << ": Assertion failed: " #c << std::endl;        \
-            for (const TestContext* ctx = TestContext::currContext();   \
-                 ctx; ctx = ctx->prevContext())                         \
-                std::cout << "  Context: " << ctx->str() << std::endl;  \
-            ++errorCount;                                               \
-        }                                                               \
-    } while (false)
 
 // is_inbounds derives from true_type if `T` is a tuple and
 // `I < tuple_size<Tuple>::value`; otherwise false_type.
@@ -1165,7 +1133,8 @@ int main()
     typedef exp::erased_type      ET;
 
 #define TEST(Alloc, Prefix, expUsesAlloc, expUsesMemRsrc) do {  \
-        TestContext tc("TestType<" #Alloc "," #Prefix ">");     \
+        TestContext tc(__FILE__, __LINE__,                      \
+                       "TestType<" #Alloc "," #Prefix ">");     \
         runTest<Alloc, Prefix, expUsesAlloc, expUsesMemRsrc>(); \
     } while (false)
 
@@ -1179,7 +1148,8 @@ int main()
 
 #define PAIR_TEST(Alloc1, Prefix1, expUsesAlloc1, expUsesMemRsrc1,      \
                   Alloc2, Prefix2, expUsesAlloc2, expUsesMemRsrc2) do { \
-        TestContext tc("pair<TestType<" #Alloc1 "," #Prefix1 ">, "      \
+        TestContext tc(__FILE__, __LINE__,                              \
+                       "pair<TestType<" #Alloc1 "," #Prefix1 ">, "      \
                        "TestType<" #Alloc2 "," #Prefix2 ">>");          \
         runPairTest<Alloc1, Prefix1, expUsesAlloc1, expUsesMemRsrc1,    \
                     Alloc2, Prefix2, expUsesAlloc2, expUsesMemRsrc2>(); \
@@ -1210,4 +1180,6 @@ int main()
     PAIR_TEST(ET,       1, 1, 1, IntAlloc, 0, 1, 0);
     PAIR_TEST(ET,       1, 1, 1, pmr_ptr,  1, 0, 1);
     PAIR_TEST(ET,       0, 1, 1, ET,       1, 1, 1);
+
+    return errorCount();
 }

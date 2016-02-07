@@ -6,10 +6,10 @@
 
 #include <copy_swap_helper.h>
 
-#include <iostream>
 #include <vector>
 #include <cstdlib>
 #include <cassert>
+#include <test_assert.h>
 
 namespace std {
 namespace experimental {
@@ -325,15 +325,6 @@ void swap(TestType<Alloc, Prefix>& a, TestType<Alloc, Prefix>& b) noexcept
     a.swap(b);
 }
 
-static int errorCount = 0;
-#define TEST_ASSERT(c) do {                                             \
-        if (! (c)) {                                                    \
-            std::cout << __FILE__ << ':' << __LINE__                    \
-                      << ": Assertion failed: " #c << std::endl;        \
-            ++errorCount;                                               \
-        }                                                               \
-    } while (false)
-
 int main()
 {
     using std::experimental::copy_swap_helper;
@@ -639,4 +630,6 @@ int main()
         TEST_ASSERT(y.value() == 8);
         TEST_ASSERT(PA1 == y.get_allocator());
     }
+
+    return errorCount();
 }
