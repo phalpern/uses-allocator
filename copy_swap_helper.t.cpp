@@ -329,6 +329,7 @@ int main()
 {
     using std::experimental::copy_swap_helper;
     using std::experimental::copy_swap;
+    using std::experimental::move_swap;
 
     typedef MySTLAlloc<int> IntAlloc;
     typedef pmr::memory_resource* pmr_ptr;
@@ -358,7 +359,7 @@ int main()
         Obj& yr = copy_swap(y, q);
         TEST_ASSERT(&yr == &y);
         TEST_ASSERT(y == q);
-        Obj& zr = copy_swap(z, Obj(8));
+        Obj& zr = move_swap(z, Obj(8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z == Obj(8));
     }
@@ -396,7 +397,7 @@ int main()
         TEST_ASSERT(y == q);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj& zr = copy_swap(z, Obj(8, A1));
+        Obj& zr = move_swap(z, Obj(8, A1));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(A2 == z.get_allocator());
@@ -435,7 +436,7 @@ int main()
         TEST_ASSERT(y == q);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj& zr = copy_swap(z, Obj(8, pR1));
+        Obj& zr = move_swap(z, Obj(8, pR1));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(pR2 == z.get_memory_resource());
@@ -474,7 +475,7 @@ int main()
         TEST_ASSERT(y == q);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj& zr = copy_swap(z, Obj(8, A1));
+        Obj& zr = move_swap(z, Obj(8, A1));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(R2 == *z.get_memory_resource());
@@ -513,7 +514,7 @@ int main()
         TEST_ASSERT(y == q);
         TEST_ASSERT(A1 == y.get_allocator());
 
-        Obj& zr = copy_swap(z, Obj(std::allocator_arg, A1, 8));
+        Obj& zr = move_swap(z, Obj(std::allocator_arg, A1, 8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(A2 == z.get_allocator());
@@ -552,7 +553,7 @@ int main()
         TEST_ASSERT(y == q);
         TEST_ASSERT(pR1 == y.get_memory_resource());
 
-        Obj& zr = copy_swap(z, Obj(std::allocator_arg, pR1, 8));
+        Obj& zr = move_swap(z, Obj(std::allocator_arg, pR1, 8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(pR2 == z.get_memory_resource());
@@ -591,13 +592,13 @@ int main()
         TEST_ASSERT(y == q);
         TEST_ASSERT(R1 == *y.get_memory_resource());
 
-        Obj& zr = copy_swap(z, Obj(std::allocator_arg, A1, 8));
+        Obj& zr = move_swap(z, Obj(std::allocator_arg, A1, 8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z.value() == 8);
         TEST_ASSERT(R2 == *z.get_memory_resource());
     }
 
-    // Test propagating allocator with `copy_swap`
+    // Test propagating allocator with `copy_swap` and `move_swap`
     {
         typedef MyPocAlloc<int> IntPocAlloc;
         typedef TestType<IntPocAlloc> Obj;
@@ -625,7 +626,7 @@ int main()
         TEST_ASSERT(x == q);
         TEST_ASSERT(PA2 == x.get_allocator());
 
-        Obj &ry = copy_swap(y, Obj(8, PA1));
+        Obj &ry = move_swap(y, Obj(8, PA1));
         TEST_ASSERT(&ry == &y);
         TEST_ASSERT(y.value() == 8);
         TEST_ASSERT(PA1 == y.get_allocator());
