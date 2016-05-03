@@ -214,6 +214,37 @@ swap_assign(T& lhs, decay_t<T> const& rhs)
     return lhs;
 }
 
+template <class F, class... Args>
+inline
+auto
+copy_swap_transaction_imp(integral_constant<size_t, 0>, F&& f, Args&... args)
+{
+    return std::forward<F>(f)(args...);
+}
+
+template <size_t N, class T, class... Rest>
+inline
+auto
+copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
+{
+    T tprime(copy_swap_helper(t));
+    auto ret = copy_swap_transaction_imp(integral_constant<size_t, N-1>(),
+                                         std::forward<Rest>(rest)..., tprime);
+    using std::swap;
+    swap(t, tprime);
+    return ret;
+}
+
+template <class T, class R1, class... Rest>
+inline
+auto copy_swap_transaction(T& t, R1&& r1, Rest&&... rest)
+{
+    return 
+    copy_swap_transaction_imp(integral_constant<size_t, 1 + sizeof...(Rest)>(),
+                              t, std::forward<R1>(r1),
+                              std::forward<Rest>(rest)...);
+}
+
 } // close fundamentals_v3
 } // close experimental
 } // close std
