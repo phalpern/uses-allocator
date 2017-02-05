@@ -1,5 +1,5 @@
 
-CXX = clang++
+CXX ?= clang++
 OPT = -g -fno-inline
 CXXFLAGS = $(OPT) -std=c++14 -I.
 
