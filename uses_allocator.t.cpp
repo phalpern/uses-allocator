@@ -362,8 +362,8 @@ void runTest()
     MyPmrPtr pR0 = &DefaultResource;
     MyMemResource R1(1); MyPmrPtr pR1 = &R1;
 
-    TEST_ASSERT(usesAlloc   == (exp::uses_allocator<Obj, CharAlloc>::value));
-    TEST_ASSERT(usesMemRsrc == (exp::uses_allocator<Obj, pmr_ptr>::value));
+    TEST_ASSERT(usesAlloc   == (std::uses_allocator<Obj, CharAlloc>::value));
+    TEST_ASSERT(usesMemRsrc == (std::uses_allocator<Obj, pmr_ptr>::value));
 
     // Test with allocator
     {
@@ -557,10 +557,10 @@ void runPairTest()
     MyPmrPtr pR0 = &DefaultResource;
     MyMemResource R1(1); MyPmrPtr pR1 = &R1;
 
-    TEST_ASSERT(usesAlloc1   == (exp::uses_allocator<Elem1, CharAlloc>::value));
-    TEST_ASSERT(usesAlloc2   == (exp::uses_allocator<Elem2, CharAlloc>::value));
-    TEST_ASSERT(usesMemRsrc1 == (exp::uses_allocator<Elem1, pmr_ptr>::value));
-    TEST_ASSERT(usesMemRsrc2 == (exp::uses_allocator<Elem2, pmr_ptr>::value));
+    TEST_ASSERT(usesAlloc1   == (std::uses_allocator<Elem1, CharAlloc>::value));
+    TEST_ASSERT(usesAlloc2   == (std::uses_allocator<Elem2, CharAlloc>::value));
+    TEST_ASSERT(usesMemRsrc1 == (std::uses_allocator<Elem1, pmr_ptr>::value));
+    TEST_ASSERT(usesMemRsrc2 == (std::uses_allocator<Elem2, pmr_ptr>::value));
 
     // Test with no constructor arguments
     {

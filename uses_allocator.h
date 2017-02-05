@@ -52,13 +52,6 @@ namespace internal {
 
 template <bool V> using boolean_constant = integral_constant<bool, V>;
 
-template <class T, class Alloc, class = void_t<> >
-struct uses_allocator_imp : false_type { };
-
-template <class T, class Alloc>
-struct uses_allocator_imp<T, Alloc, void_t<typename T::allocator_type>>
-    : is_convertible<Alloc, typename T::allocator_type> { };
-
 // Metafunction `pair_uses_allocator<T, A>` evaluates true iff `T` is a
 // specialization of `std::pair` and `uses_allocator<T::first_type, A>` and/or
 // `uses_allocator<T::second_type, A>` are true.
@@ -199,9 +192,6 @@ auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
 
 
 } // close namespace internal
-
-template <class T, class Alloc>
-struct uses_allocator : internal::uses_allocator_imp<T, Alloc>::type { };
 
 template <class T, class Alloc, class... Args>
 auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
