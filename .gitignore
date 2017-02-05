@@ -1,4 +1,5 @@
 *~
 *.t
 *.dSYM
+*.pdf
 .DS_Store
