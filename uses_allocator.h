@@ -15,9 +15,6 @@ namespace std {
 namespace experimental {
 inline namespace fundamentals_v2 {
 
-// Types from existing TS draft
-struct erased_type { };
-
 namespace pmr {
 
 struct memory_resource
@@ -60,16 +57,13 @@ struct uses_allocator_imp : false_type { };
 
 template <class T, class Alloc>
 struct uses_allocator_imp<T, Alloc, void_t<typename T::allocator_type>>
-    : boolean_constant<
-        is_convertible<Alloc, typename T::allocator_type>::value ||
-        is_same<erased_type, typename T::allocator_type>::value
-      > { };
+    : is_convertible<Alloc, typename T::allocator_type> { };
 
 // Metafunction `pair_uses_allocator<T, A>` evaluates true iff `T` is a
 // specialization of `std::pair` and `uses_allocator<T::first_type, A>` and/or
 // `uses_allocator<T::second_type, A>` are true.
-template <class T, class A> 
-struct pair_uses_allocator : false_type 
+template <class T, class A>
+struct pair_uses_allocator : false_type
 {
 };
 
@@ -96,7 +90,7 @@ auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload is handles types for which `uses_allocator<T, Alloc>` is
+// This overload handles types for which `uses_allocator<T, Alloc>` is
 // true and constructor `T(allocator_arg_t, a, args...)` is valid.
 template <class T, class Alloc, class... Args>
 auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
@@ -106,13 +100,13 @@ auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
                                 Args&&... args)
 {
     // Allocator added to front of argument list, after `allocator_arg`.
-    return std::forward_as_tuple(allocator_arg, a, 
+    return std::forward_as_tuple(allocator_arg, a,
                                  std::forward<Args>(args)...);
 }
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload is handles types for which `uses_allocator<T, Alloc>` is
+// This overload handles types for which `uses_allocator<T, Alloc>` is
 // true and constructor `T(allocator_arg_t, a, args...)` NOT valid.
 // This function will produce invalid results unless `T(args..., a)` is valid.
 template <class T1, class Alloc, class... Args>
@@ -128,7 +122,7 @@ auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload is handles specializations of `std::pair` for which
+// This overload handles specializations of `std::pair` for which
 // `uses_allocator<T, Alloc>` is true for either or both of the elements and
 // no other constructor arguments are passed in.
 template <class T, class Alloc>
@@ -145,7 +139,7 @@ auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload is handles specializations of `std::pair` for which
+// This overload handles specializations of `std::pair` for which
 // `uses_allocator<T, Alloc>` is true for either or both of the elements and
 // a single argument of type const-lvalue-of-pair is passed in.
 template <class T, class Alloc, class U1, class U2>
@@ -165,7 +159,7 @@ auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload is handles specializations of `std::pair` for which
+// This overload handles specializations of `std::pair` for which
 // `uses_allocator<T, Alloc>` is true for either or both of the elements and
 // a single argument of type rvalue-of-pair is passed in.
 template <class T, class Alloc, class U1, class U2>
@@ -185,9 +179,9 @@ auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload is handles specializations of `std::pair` for which
+// This overload handles specializations of `std::pair` for which
 // `uses_allocator<T, Alloc>` is true for either or both of the elements and
-// a two additional constructor arguments are passed in.
+// two additional constructor arguments are passed in.
 template <class T, class Alloc, class U1, class U2>
 auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
                                 false_type /* uses_allocator */,
@@ -203,7 +197,7 @@ auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
                                                             forward<U2>(arg2)));
 }
 
-    
+
 } // close namespace internal
 
 template <class T, class Alloc>
@@ -228,11 +222,11 @@ T make_using_allocator(allocator_arg_t, const Alloc& a, Args&&... args)
     return make_from_tuple<T>(
         forward_uses_allocator_args<T>(allocator_arg, a,
                                        forward<Args>(args)...));
-                                                             
+
 }
 
 template <class T, class Alloc, class... Args>
-T* uninitialized_construct_using_allocator(T* p, 
+T* uninitialized_construct_using_allocator(T* p,
                                            allocator_arg_t, const Alloc& a,
                                            Args&&... args)
 {
