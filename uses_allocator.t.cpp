@@ -367,7 +367,7 @@ void runTest()
 
     // Test with allocator
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1);
+        auto args = exp::uses_allocator_construction_args<Obj>(A1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesAlloc ? (Prefix ? 2 : 1) : 0;
         const std::size_t allocArg = PrefixAlloc ? 1 : numArgs - 1;
@@ -388,13 +388,12 @@ void runTest()
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, A1);
+        Obj X = exp::make_using_allocator<Obj>(A1);
         TEST_ASSERT(0 == X.value());
         TEST_ASSERT(usesAlloc == X.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == X.match_resource(pR0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                A1);
         TEST_ASSERT(0 == pY->value());
         TEST_ASSERT(usesAlloc == pY->match_allocator(A1));
@@ -404,8 +403,8 @@ void runTest()
 
     // Test with allocator and value.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1,
-                                                          std::move(val));
+        auto args = exp::uses_allocator_construction_args<Obj>(A1,
+                                                               std::move(val));
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesAlloc ? (Prefix ? 3 : 2) : 1;
         const std::size_t valArg = PrefixAlloc ? numArgs - 1 : 0;
@@ -428,13 +427,12 @@ void runTest()
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, A1, 7);
+        Obj X = exp::make_using_allocator<Obj>(A1, 7);
         TEST_ASSERT(7 == X.value());
         TEST_ASSERT(usesAlloc == X.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == X.match_resource(pR0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                A1, 7);
         TEST_ASSERT(7 == pY->value());
         TEST_ASSERT(usesAlloc == pY->match_allocator(A1));
@@ -444,7 +442,7 @@ void runTest()
 
     // Test with memory resource
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, pR1);
+        auto args = exp::uses_allocator_construction_args<Obj>(pR1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesMemRsrc ? (Prefix ? 2 : 1) : 0;
         const std::size_t rsrcArg = PrefixRsrc ? 1 : numArgs - 1;
@@ -465,13 +463,12 @@ void runTest()
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, pR1);
+        Obj X = exp::make_using_allocator<Obj>(pR1);
         TEST_ASSERT(0 == X.value());
         TEST_ASSERT(usesMemRsrc == X.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == X.match_allocator(A0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                pR1);
         TEST_ASSERT(0 == pY->value());
         TEST_ASSERT(usesMemRsrc == pY->match_resource(pR1));
@@ -481,8 +478,8 @@ void runTest()
 
     // Test with memory resource and value.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg,pR1,
-                                                          std::move(val));
+        auto args = exp::uses_allocator_construction_args<Obj>(pR1,
+                                                               std::move(val));
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs = usesMemRsrc ? (Prefix ? 3 : 2) : 1;
         const std::size_t valArg = PrefixRsrc ? numArgs - 1 : 0;
@@ -505,13 +502,12 @@ void runTest()
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, pR1, 7);
+        Obj X = exp::make_using_allocator<Obj>(pR1, 7);
         TEST_ASSERT(7 == X.value());
         TEST_ASSERT(usesMemRsrc == X.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == X.match_allocator(A0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                pR1, 7);
         TEST_ASSERT(7 == pY->value());
         TEST_ASSERT(usesMemRsrc == pY->match_resource(pR1));
@@ -610,7 +606,7 @@ void runPairTest()
 
     // Test with allocator
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1);
+        auto args = exp::uses_allocator_construction_args<Obj>(A1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs  = usesAlloc ? 3 : 0;
         TEST_ASSERT(expNumArgs == numArgs);
@@ -651,7 +647,7 @@ void runPairTest()
                     pW->second.match_resource(pR0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, A1);
+        Obj X = exp::make_using_allocator<Obj>(A1);
         TEST_ASSERT(0 == X.first.value());
         TEST_ASSERT(0 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -662,7 +658,6 @@ void runPairTest()
                     X.second.match_resource(pR0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                A1);
         TEST_ASSERT(0 == pY->first.value());
         TEST_ASSERT(0 == pY->second.value());
@@ -677,8 +672,9 @@ void runPairTest()
 
     // Test with allocator and two values.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1,
-                                                          std::move(val1),val2);
+        auto args = exp::uses_allocator_construction_args<Obj>(A1,
+                                                               std::move(val1),
+                                                               val2);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs  = usesAlloc ? 3 : 2;
         TEST_ASSERT(expNumArgs == numArgs);
@@ -734,8 +730,7 @@ void runPairTest()
                     pW->second.match_resource(pR0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, A1,
-                                               std::move(val1), val2);
+        Obj X = exp::make_using_allocator<Obj>(A1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -746,7 +741,6 @@ void runPairTest()
                     X.second.match_resource(pR0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                A1,
                                                                std::move(val1),
                                                                val2);
@@ -763,8 +757,7 @@ void runPairTest()
 
     // Test with allocator and lvalue pair value.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, A1,
-                                                          val);
+        auto args = exp::uses_allocator_construction_args<Obj>(A1, val);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs  = usesAlloc ? 3 : 1;
         TEST_ASSERT(expNumArgs == numArgs);
@@ -821,8 +814,7 @@ void runPairTest()
                     pW->second.match_resource(pR0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, A1,
-                                               std::move(val1), val2);
+        Obj X = exp::make_using_allocator<Obj>(A1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -833,7 +825,6 @@ void runPairTest()
                     X.second.match_resource(pR0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                A1,
                                                                std::move(val1),
                                                                val2);
@@ -850,7 +841,7 @@ void runPairTest()
 
     // Test with memory_resource
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, pR1);
+        auto args = exp::uses_allocator_construction_args<Obj>(pR1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs  = usesMemRsrc ? 3 : 0;
         TEST_ASSERT(expNumArgs == numArgs);
@@ -891,7 +882,7 @@ void runPairTest()
                     pW->second.match_allocator(A0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, pR1);
+        Obj X = exp::make_using_allocator<Obj>(pR1);
         TEST_ASSERT(0 == X.first.value());
         TEST_ASSERT(0 == X.second.value());
         TEST_ASSERT(usesMemRsrc1 == X.first.match_resource(pR1));
@@ -902,7 +893,6 @@ void runPairTest()
                     X.second.match_allocator(A0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                pR1);
         TEST_ASSERT(0 == pY->first.value());
         TEST_ASSERT(0 == pY->second.value());
@@ -917,8 +907,9 @@ void runPairTest()
 
     // Test with memory_resource and two values.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, pR1,
-                                                          std::move(val1),val2);
+        auto args = exp::uses_allocator_construction_args<Obj>(pR1,
+                                                               std::move(val1),
+                                                               val2);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs  = usesMemRsrc ? 3 : 2;
         TEST_ASSERT(expNumArgs == numArgs);
@@ -974,8 +965,7 @@ void runPairTest()
                     pW->second.match_allocator(A0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, pR1,
-                                               std::move(val1), val2);
+        Obj X = exp::make_using_allocator<Obj>(pR1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesMemRsrc1 == X.first.match_resource(pR1));
@@ -986,7 +976,6 @@ void runPairTest()
                     X.second.match_allocator(A0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                pR1,
                                                                std::move(val1),
                                                                val2);
@@ -1003,8 +992,7 @@ void runPairTest()
 
     // Test with memory_resource and lvalue pair value.
     {
-        auto args = exp::forward_uses_allocator_args<Obj>(allocator_arg, pR1,
-                                                          val);
+        auto args = exp::uses_allocator_construction_args<Obj>(pR1, val);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
         const std::size_t expNumArgs  = usesMemRsrc ? 3 : 1;
         TEST_ASSERT(expNumArgs == numArgs);
@@ -1061,8 +1049,7 @@ void runPairTest()
                     pW->second.match_allocator(A0));
         pW->~Obj();
 
-        Obj X = exp::make_using_allocator<Obj>(allocator_arg, pR1,
-                                               std::move(val1), val2);
+        Obj X = exp::make_using_allocator<Obj>(pR1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesMemRsrc1 == X.first.match_resource(pR1));
@@ -1073,7 +1060,6 @@ void runPairTest()
                     X.second.match_allocator(A0));
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
-                                                               allocator_arg,
                                                                pR1,
                                                                std::move(val1),
                                                                val2);

@@ -43,38 +43,38 @@ inline namespace fundamentals_v3 {
 
 ////////////////////////////////////////////////////////////////////////
 
+template <class T, class A>
+struct has_allocator : std::uses_allocator<T, A> { };
+
+// Specialization of `has_allocator` for `std::pair`
+template <class T1, class T2, class A>
+struct has_allocator<pair<T1, T2>, A>
+    : integral_constant<bool, has_allocator<T1, A>::value ||
+                              has_allocator<T2, A>::value>
+{
+};
+
 // Forward declaration
 template <class T, class Alloc, class... Args>
-auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
-                                 Args&&... args);
+auto uses_allocator_construction_args(const Alloc& a, Args&&... args);
 
 namespace internal {
 
 template <bool V> using boolean_constant = integral_constant<bool, V>;
 
-// Metafunction `pair_uses_allocator<T, A>` evaluates true iff `T` is a
-// specialization of `std::pair` and `uses_allocator<T::first_type, A>` and/or
-// `uses_allocator<T::second_type, A>` are true.
-template <class T, class A>
-struct pair_uses_allocator : false_type
-{
-};
+template <class T> struct is_pair : false_type { };
 
-template <class T1, class T2, class A>
-struct pair_uses_allocator<pair<T1, T2>, A>
-    : boolean_constant<uses_allocator<T1, A>::value ||
-                       uses_allocator<T2, A>::value>
-{
-};
+template <class T1, class T2>
+struct is_pair<std::pair<T1, T2>> : true_type { };
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload is handles types for which `uses_allocator<T, Alloc>` is false.
-template <class T, class Unused, class Alloc, class... Args>
-auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
-                                false_type /* uses_allocator */,
-                                Unused     /* uses prefix allocator arg */,
-                                allocator_arg_t, const Alloc&,
+// This overload is handles types for which `has_allocator<T, Alloc>` is false.
+template <class T, class Unused1, class Unused2, class Alloc, class... Args>
+auto uses_allocator_args_imp(Unused1    /* is_pair */,
+                                false_type /* has_allocator */,
+                                Unused2    /* uses prefix allocator arg */,
+                                const Alloc&,
                                 Args&&... args)
 {
     // Allocator is ignored
@@ -83,13 +83,13 @@ auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload handles types for which `uses_allocator<T, Alloc>` is
+// This overload handles types for which `has_allocator<T, Alloc>` is
 // true and constructor `T(allocator_arg_t, a, args...)` is valid.
 template <class T, class Alloc, class... Args>
-auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
-                                true_type  /* uses_allocator */,
+auto uses_allocator_args_imp(false_type /* is_pair */,
+                                true_type  /* has_allocator */,
                                 true_type  /* uses prefix allocator arg */,
-                                allocator_arg_t, const Alloc& a,
+                                const Alloc& a,
                                 Args&&... args)
 {
     // Allocator added to front of argument list, after `allocator_arg`.
@@ -99,14 +99,14 @@ auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
-// This overload handles types for which `uses_allocator<T, Alloc>` is
+// This overload handles types for which `has_allocator<T, Alloc>` is
 // true and constructor `T(allocator_arg_t, a, args...)` NOT valid.
 // This function will produce invalid results unless `T(args..., a)` is valid.
 template <class T1, class Alloc, class... Args>
-auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
-                                true_type  /* uses_allocator */,
+auto uses_allocator_args_imp(false_type /* is_pair */,
+                                true_type  /* has_allocator */,
                                 false_type /* prefix allocator arg */,
-                                allocator_arg_t, const Alloc& a,
+                                const Alloc& a,
                                 Args&&... args)
 {
     // Allocator added to end of argument list
@@ -116,114 +116,115 @@ auto forward_uses_allocator_imp(false_type /* pair_uses_allocator */,
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
 // This overload handles specializations of `std::pair` for which
-// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// `has_allocator<T, Alloc>` is true for either or both of the elements and
 // no other constructor arguments are passed in.
 template <class T, class Alloc>
-auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
-                                false_type /* uses_allocator */,
+auto uses_allocator_args_imp(true_type  /* is_pair */,
+                                true_type  /* has_allocator */,
                                 false_type /* prefix allocator arg */,
-                                allocator_arg_t, const Alloc& a)
+                                const Alloc& a)
 {
+    using T1 = typename T::first_type;
+    using T2 = typename T::second_type;
+
     return std::make_tuple(
         piecewise_construct,
-        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a),
-        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a));
+        uses_allocator_construction_args<T1>(a),
+        uses_allocator_construction_args<T2>(a));
 }
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
 // This overload handles specializations of `std::pair` for which
-// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// `has_allocator<T, Alloc>` is true for either or both of the elements and
 // a single argument of type const-lvalue-of-pair is passed in.
 template <class T, class Alloc, class U1, class U2>
-auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
-                                false_type /* uses_allocator */,
+auto uses_allocator_args_imp(true_type  /* is_pair */,
+                                true_type  /* has_allocator */,
                                 false_type /* prefix allocator arg */,
-                                allocator_arg_t, const Alloc& a,
+                                const Alloc& a,
                                 const pair<U1, U2>& arg)
 {
+    using T1 = typename T::first_type;
+    using T2 = typename T::second_type;
+
     return std::make_tuple(
         piecewise_construct,
-        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a,
-                                                            arg.first),
-        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a,
-                                                             arg.second));
+        uses_allocator_construction_args<T1>(a, arg.first),
+        uses_allocator_construction_args<T2>(a, arg.second));
 }
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
 // This overload handles specializations of `std::pair` for which
-// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// `has_allocator<T, Alloc>` is true for either or both of the elements and
 // a single argument of type rvalue-of-pair is passed in.
 template <class T, class Alloc, class U1, class U2>
-auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
-                                false_type /* uses_allocator */,
+auto uses_allocator_args_imp(true_type  /* is_pair */,
+                                true_type  /* has_allocator */,
                                 false_type /* prefix allocator arg */,
-                                allocator_arg_t, const Alloc& a,
+                                const Alloc& a,
                                 pair<U1, U2>&& arg)
 {
+    using T1 = typename T::first_type;
+    using T2 = typename T::second_type;
+
     return std::make_tuple(
         piecewise_construct,
-        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a,
-                                                      forward<U1>(arg.first)),
-        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a,
-                                                      forward<U2>(arg.second)));
+        uses_allocator_construction_args<T1>(a, forward<U1>(arg.first)),
+        uses_allocator_construction_args<T2>(a, forward<U2>(arg.second)));
 }
 
 // Return a tuple of arguments appropriate for uses-allocator construction
 // with allocator `Alloc` and ctor arguments `Args`.
 // This overload handles specializations of `std::pair` for which
-// `uses_allocator<T, Alloc>` is true for either or both of the elements and
+// `has_allocator<T, Alloc>` is true for either or both of the elements and
 // two additional constructor arguments are passed in.
 template <class T, class Alloc, class U1, class U2>
-auto forward_uses_allocator_imp(true_type  /* pair_uses_allocator */,
-                                false_type /* uses_allocator */,
+auto uses_allocator_args_imp(true_type  /* is_pair */,
+                                true_type /* has_allocator */,
                                 false_type /* prefix allocator arg */,
-                                allocator_arg_t, const Alloc& a,
+                                const Alloc& a,
                                 U1&& arg1, U2&& arg2)
 {
+    using T1 = typename T::first_type;
+    using T2 = typename T::second_type;
+
     return std::make_tuple(
         piecewise_construct,
-        forward_uses_allocator_args<typename T::first_type>(allocator_arg, a,
-                                                            forward<U1>(arg1)),
-        forward_uses_allocator_args<typename T::second_type>(allocator_arg, a,
-                                                            forward<U2>(arg2)));
+        uses_allocator_construction_args<T1>(a, forward<U1>(arg1)),
+        uses_allocator_construction_args<T2>(a, forward<U2>(arg2)));
 }
 
 
 } // close namespace internal
 
 template <class T, class Alloc, class... Args>
-auto forward_uses_allocator_args(allocator_arg_t, const Alloc& a,
-                                 Args&&... args)
+auto uses_allocator_construction_args(const Alloc& a, Args&&... args)
 {
     using namespace internal;
-    return forward_uses_allocator_imp<T>(pair_uses_allocator<T, Alloc>(),
-                                         uses_allocator<T, Alloc>(),
+    return uses_allocator_args_imp<T>(is_pair<T>(),
+                                         has_allocator<T, Alloc>(),
                                          is_constructible<T, allocator_arg_t,
                                                           Alloc, Args...>(),
-                                         allocator_arg, a,
-                                         std::forward<Args>(args)...);
+                                         a, std::forward<Args>(args)...);
 }
 
 template <class T, class Alloc, class... Args>
-T make_using_allocator(allocator_arg_t, const Alloc& a, Args&&... args)
+T make_using_allocator(const Alloc& a, Args&&... args)
 {
     return make_from_tuple<T>(
-        forward_uses_allocator_args<T>(allocator_arg, a,
-                                       forward<Args>(args)...));
-
+        uses_allocator_construction_args<T>(a, forward<Args>(args)...));
 }
 
 template <class T, class Alloc, class... Args>
 T* uninitialized_construct_using_allocator(T* p,
-                                           allocator_arg_t, const Alloc& a,
+                                           const Alloc& a,
                                            Args&&... args)
 {
     return uninitialized_construct_from_tuple(
         p,
-        forward_uses_allocator_args<T>(allocator_arg, a,
-                                       forward<Args>(args)...));
+        uses_allocator_construction_args<T>(a, forward<Args>(args)...));
 }
 
 } // close namespace fundamentals_v3
