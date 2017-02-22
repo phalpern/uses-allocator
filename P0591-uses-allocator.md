@@ -55,40 +55,101 @@ The following wording is still rough. More detailed wording to come after LEWG
 review and revision. Wording is relative to the November 2016 Committee Draft,
 N5131.
 
-Add three new function templates to `<memory>`:
+Add the following new function templates to `<memory>`:
 
     template <class T, class Alloc, class... Args>
-    auto uses_allocator_construction_args(const Alloc& a, Args&&... args);
+      auto uses_allocator_construction_args(const Alloc& a, Args&&... args);
 
-> _Returns_: A `tuple` value determined as follows:
+> _Returns_: A `tuple` value determined as follows: 
 
- 1. If `T` is of type `pair<T1, T2>` and
-    `uses_allocator_v<T1> || uses_allocator_v<T2>` then
-   a. If `Args...` is empty, returns
-      `make_tuple(
-        piecewise_construct,
-        uses_allocator_construction_args<T1>(a),
-        uses_allocator_construction_args<T2>(a))`
-   b. Otherwise, if `Args...` matches `const pair<U1, U2>& arg`, returns
-      `make_tuple(
-        piecewise_construct,
-        uses_allocator_construction_args<T1>(a, arg.first),
-        uses_allocator_construction_args<T2>(a, arg.second)`
-   c. Otherwise, if `Args...` matches `pair<U1, U2>&& arg`, returns
-      `make_tuple(
-        piecewise_construct,
-        uses_allocator_construction_args<T1>(a, forward<U1>(arg.first)),
-        uses_allocator_construction_args<T2>(a, forward<U2>(arg.second)))`
-   d. Otherwise, if `Args...` matches `U1&& arg1, U2&& arg2`, returns
-      `make_tuple(
-        piecewise_construct,
-        uses_allocator_construction_args<T1>(a, forward<U1>(arg1)),
-        uses_allocator_construction_args<T2>(a, forward<U2>(arg2)))`
-   e. Otherwise, if `Args...` matches `piecewise_construct_t, Tpl1 tpl1,
-      Tpl2 tpl2`, returns
-      `make_tuple(
-        piecewise_construct,
-        apply(uses_allocator_construction<T1>, a, tp1),
-        apply(uses_allocator_construction<T2>, a, tp2)`.
-   f. Otherwise the program is ill-formed.
- 2. Otherwise, if `uses_
+> - if `uses_allocator_v<T, Alloc>` is false and
+    `is_constructible_v<T, Args...>` is true, return
+    `make_tuple(std::forward<Args>(args)...)`.
+
+> - otherwise, if `uses_allocator_v<T, Alloc>` is true and
+    `is_constructible_v<T, allocator_arg_t, Alloc, Args...>` is true, return
+    `make_tuple(allocator_arg, alloc, std::forward<Args>(args)...)`.
+
+> - otherwise, if `uses_allocator_v<T, Alloc>` is true and
+    `is_constructible_v<T, Args..., Alloc>` is true, return
+    `make_tuple(std::forward<Args>(args)..., alloc)`.
+
+> - otherwise, the program is ill-formed. [_Note_: An error will result if
+    `uses_allocator_v<T, Alloc>` is true but the specific constructor does not
+    take an allocator. This definition prevents a silent failure to pass the
+    allocator to a constructor. — _end note_]
+
+**Editorial note:** The following are specializations for `T` being
+`pair<T1,T2>`. They are not in the correct form for a specialization/overload
+because of the absence of partial specialization for functions. This detail
+will be corrected in the next version of this paper.
+
+    template <class T1, class T2, class... Args1, class... Args2>
+      auto uses_allocator_construction_args(const Alloc& a,
+                                            piecewise_construct_t,
+                                            tuple<Args1...> x,
+                                            tuple<Args2...> y);
+
+> _Returns_: Equivalent to
+
+        make_tuple(piecewise_construct,
+                   apply(x, [](Args1... args1){
+                      uses_allocator_construction_args<T1>(a,
+                          std::forward<Args1>(args1)...);
+                   }),
+                   apply(y, [](Args2... args2){
+                      uses_allocator_construction_args<T2>(a,
+                          std::forward<Args2>(args2)...);
+                   }));
+
+    template <class T1, class T2>
+      auto uses_allocator_construction_args(const Alloc& a);
+
+> _Returns_: `uses_allocator_construction_args<pair<T1,T2>>(a,
+  piecewise_construct, tuple<>(), tuple<>)`
+
+    template <class T1, class T2, class U, class V>
+      auto uses_allocator_construction_args(const Alloc& a, U&& u, V&& v);
+
+> _Returns_: `uses_allocator_construction_args<pair<T1,T2>>(a,
+  piecewise_construct, forward_as_tuple(std::forward<U>(u)),
+  forward_as_tuple(std::forward<V>(v)))`.
+
+    template <class T1, class T2, class U, class V>
+      auto uses_allocator_construction_args(const Alloc& a, const pair<U,V>& pr);
+
+> _Returns_: `uses_allocator_construction_args<pair<T1,T2>>(a,
+  piecewise_construct, forward_as_tuple(pr.first),
+  forward_as_tuple(pr.second))`.
+
+    template <class T1, class T2, class U, class V>
+      auto uses_allocator_construction_args(const Alloc& a, pair<U,V>&& pr);
+
+> _Returns_: `uses_allocator_construction_args<pair<T1,T2>>(a,
+  piecewise_construct, forward_as_tuple(std::forward<U>(pr.first)),
+  forward_as_tuple(std::forward<V>(pr.second)))`.
+
+    template <class T, class Alloc, class... Args>
+      T make_using_allocator(const Alloc& a, Args&&... args)
+
+> _Returns_: equivalent to
+
+        return make_from_tuple<T>(
+            uses_allocator_construction_args<T>(a, forward<Args>(args)...));
+
+    template <class T, class Alloc, class... Args>
+      T* uninitialized_construct_using_allocator(T* p,
+                                               const Alloc& a,
+                                               Args&&... args)
+> _Returns_: equivalent to
+
+        return uninitialized_construct_from_tuple(
+            p,
+            uses_allocator_construction_args<T>(a, forward<Args>(args)...));
+
+Additionally, rewrite the `construct` methods of `polymorphic_allocator` and
+`scoped_allocator_adaptor` in terms of the above.
+
+Consider replacing all uses of _uses allocator construction_ with references
+to these functions and removing  _uses allocator construction_ from the
+standard.
