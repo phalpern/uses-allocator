@@ -19,8 +19,7 @@ template <class... T> using void_t = typename void_t_imp<T...>::type;
 
 } // close namespace cpp17
 
-namespace experimental {
-inline namespace fundamentals_v3 {
+inline namespace cpp20 {
 
 namespace internal {
 
@@ -57,8 +56,7 @@ T* uninitialized_construct_from_tuple(T* p, Tuple&& args_tuple)
                                                      Indices{});
 }
 
-} // close namespace fundamentals_v3
-} // close namespace experimental
+} // close namespace cpp20
 } // close namespace std
 
 #endif // ! defined(INCLUDED_MAKE_FROM_TUPLE_DOT_H)

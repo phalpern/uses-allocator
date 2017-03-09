@@ -7,10 +7,9 @@
 #include <make_from_tuple.h>
 
 #include <utility>
+#include <tuple>
 #include <string>
 #include <test_assert.h>
-
-namespace exp = std::experimental;
 
 class TestType
 {
@@ -44,16 +43,16 @@ template <class TupleType>
 void runTest(const TupleType& tpl, const TestType& exp)
 {
     typedef TestType TT;
-    
+
     {
         TupleType tplCopy(tpl);
 
         // Test make_from_tuple with lvalue
-        TT Obj1 = exp::make_from_tuple<TT>(tpl);
+        TT Obj1 = std::make_from_tuple<TT>(tpl);
         TEST_ASSERT(exp == Obj1);
 
         // Test make_from_tuple with rvalue
-        TT Obj2 = exp::make_from_tuple<TT>(std::move(tplCopy));
+        TT Obj2 = std::make_from_tuple<TT>(std::move(tplCopy));
         TEST_ASSERT(exp == Obj2);
     }
 
@@ -64,13 +63,13 @@ void runTest(const TupleType& tpl, const TestType& exp)
 
         // Test uninitialized_construct_from_tuple with lvalue
         TT *pObj1 = reinterpret_cast<TT*>(ObjBuf);
-        exp::uninitialized_construct_from_tuple(pObj1, tpl);
+        std::uninitialized_construct_from_tuple(pObj1, tpl);
         TEST_ASSERT(exp == *pObj1);
         pObj1->~TT();
 
         // Test uninitialized_construct_from_tuple with rvalue
         TT *pObj2 = reinterpret_cast<TT*>(ObjBuf);
-        exp::uninitialized_construct_from_tuple(pObj2, std::move(tplCopy));
+        std::uninitialized_construct_from_tuple(pObj2, std::move(tplCopy));
         TEST_ASSERT(exp == *pObj2);
         pObj2->~TT();
     }
@@ -104,7 +103,7 @@ int main()
 
         TT exp{ 1, 2, "three" };
 
-        TT Obj = exp::make_from_tuple<TT>(
+        TT Obj = std::make_from_tuple<TT>(
             std::forward_as_tuple(1, 2, std::move(three)));
         TEST_ASSERT(exp == Obj);
         // Move-construction will leave moved-from string empty in
@@ -121,7 +120,7 @@ int main()
 
         // Test uninitialized_construct_from_tuple with rvalue
         TT *pObj = reinterpret_cast<TT*>(ObjBuf);
-        exp::uninitialized_construct_from_tuple(pObj,
+        std::uninitialized_construct_from_tuple(pObj,
                                 std::forward_as_tuple(1, 2, std::move(three)));
         TEST_ASSERT(exp == *pObj);
         // Move-construction will leave moved-from string empty in
@@ -129,7 +128,6 @@ int main()
         TEST_ASSERT(three.empty());
         pObj->~TT();
     }
-    
+
     return errorCount();
 }
-
