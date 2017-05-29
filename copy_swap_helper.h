@@ -37,24 +37,24 @@ template <typename T, typename A>
 struct uses_prefix_allocator<T,A,void_t<decltype(T(allocator_arg, declval<A>(),
                                                    declval<T>()))>>
     : true_type { };
-          
-template <typename T, typename A, typename V>
-struct uses_prefix_allocator<T&,A,V> : uses_prefix_allocator<T,A> { };
+
+// template <typename T, typename A, typename V>
+// struct uses_prefix_allocator<T&,A,V> : uses_prefix_allocator<T,A> { };
 
 template <typename T, typename A>
 constexpr bool uses_prefix_allocator_v = uses_prefix_allocator<T,A>::value;
-    
+
 template <typename T, typename A, typename = void_t<>>
 struct uses_suffix_allocator : false_type { };
 
 template <typename T, typename A>
-struct uses_suffix_allocator<T,A,void_t<decltype(T(declval<T>(), 
+struct uses_suffix_allocator<T,A,void_t<decltype(T(declval<T>(),
                                                    declval<A>()))>>
     : true_type { };
 
 template <typename T, typename A>
 constexpr bool uses_suffix_allocator_v = uses_suffix_allocator<T,A>::value;
-    
+
 template <typename T, typename = void_t<>>
 struct has_get_allocator
     : false_type { };
@@ -66,21 +66,9 @@ struct has_get_allocator<T, void_t<decltype(declval<T>().get_allocator())>>
 template <typename T>
 constexpr bool has_get_allocator_v = has_get_allocator<T>::value;
 
-template <typename T, typename = void_t<> >
-struct has_get_memory_resource
-    : false_type { };
-
-template <typename T>
-struct has_get_memory_resource<T, 
-                       void_t<decltype(declval<T>().get_memory_resource())>>
-    : true_type { };
-
-template <typename T>
-constexpr bool has_get_memory_resource_v = has_get_memory_resource<T>::value;
-
 template <typename Type, typename Alloc>
 inline
-typename enable_if< uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>, 
+typename enable_if< uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>,
                    remove_reference_t<Type>>::type
 copy_swap_helper_imp(Type&& other, const Alloc& alloc)
 {
@@ -115,19 +103,7 @@ copy_swap_helper_imp(Type&& other, const Alloc&)
 
 template <class T, class U>
 inline
-typename std::enable_if< internal::has_get_memory_resource_v<U>,
-                        remove_reference_t<U>>::type
-copy_swap_helper(T&& other, const U& alloc_source)
-{
-    using internal::copy_swap_helper_imp;
-    return copy_swap_helper_imp(std::forward<T>(other),
-                                alloc_source.get_memory_resource());
-}
-
-template <class T, class U>
-inline
-typename enable_if< internal::has_get_allocator_v<U> &&
-                   !internal::has_get_memory_resource_v<U>, 
+typename enable_if< internal::has_get_allocator_v<U>,
                    remove_reference_t<T>>::type
 copy_swap_helper(T&& other, const U& alloc_source)
 {
@@ -138,8 +114,7 @@ copy_swap_helper(T&& other, const U& alloc_source)
 
 template <class T, class U>
 inline
-typename enable_if<!internal::has_get_allocator_v<U> &&
-                   !internal::has_get_memory_resource_v<U>,
+typename enable_if<!internal::has_get_allocator_v<U>,
                    remove_reference_t<T>>::type
 copy_swap_helper(T&& other, const U& /* alloc_source */)
 {
@@ -155,9 +130,7 @@ remove_reference_t<T> copy_swap_helper(T&& other)
 
 template <class T>
 inline
-typename enable_if< internal::has_get_allocator_v<T> &&
-                   !internal::has_get_memory_resource_v<T>, 
-                   T&>::type
+typename enable_if< internal::has_get_allocator_v<T>, T&>::type
 swap_assign(T& lhs, decay_t<T>&& rhs)
 {
     using internal::copy_swap_helper_imp;
@@ -165,16 +138,15 @@ swap_assign(T& lhs, decay_t<T>&& rhs)
     constexpr bool pocma =
         allocator_traits<Alloc>::propagate_on_container_move_assignment::value;
     T R = (pocma ? T(std::move(rhs)) :
-           copy_swap_helper_imp(std::move(rhs), lhs.get_allocator()));
+           copy_swap_helper(std::move(rhs), lhs));
     using std::swap;
     swap(lhs, R);
     return lhs;
 }
-           
+
 template <class T>
 inline
-typename enable_if<!internal::has_get_allocator_v<T> ||
-                    internal::has_get_memory_resource_v<T>,
+typename enable_if<!internal::has_get_allocator_v<T>,
                    T&>::type
 swap_assign(T& lhs, decay_t<T>&& rhs)
 {
@@ -183,12 +155,10 @@ swap_assign(T& lhs, decay_t<T>&& rhs)
     swap(lhs, R);
     return lhs;
 }
-           
+
 template <class T>
 inline
-typename enable_if< internal::has_get_allocator_v<T> &&
-                   !internal::has_get_memory_resource_v<T>, 
-                   T&>::type
+typename enable_if< internal::has_get_allocator_v<T>, T&>::type
 swap_assign(T& lhs, decay_t<T> const& rhs)
 {
     using internal::copy_swap_helper_imp;
@@ -203,9 +173,7 @@ swap_assign(T& lhs, decay_t<T> const& rhs)
 
 template <class T>
 inline
-typename enable_if<!internal::has_get_allocator_v<T> ||
-                    internal::has_get_memory_resource_v<T>,
-                   T&>::type
+typename enable_if<!internal::has_get_allocator_v<T>, T&>::type
 swap_assign(T& lhs, decay_t<T> const& rhs)
 {
     T R = copy_swap_helper(rhs, lhs);
@@ -239,7 +207,7 @@ template <class T, class R1, class... Rest>
 inline
 auto copy_swap_transaction(T& t, R1&& r1, Rest&&... rest)
 {
-    return 
+    return
     copy_swap_transaction_imp(integral_constant<size_t, 1 + sizeof...(Rest)>(),
                               t, std::forward<R1>(r1),
                               std::forward<Rest>(rest)...);
