@@ -69,6 +69,12 @@ discussion of exactly what should be standardized. The options are:
 
 This proposal chooses option 3, but I am open to the other options.
     
+Implementation experience
+=========================
+
+A working implementation of this proposal can be found on GitHub at
+git@github.com:phalpern/uses-allocator.git
+
 Proposed wording
 ================
 
