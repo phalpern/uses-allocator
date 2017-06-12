@@ -10,9 +10,67 @@
 #include <cstdlib>
 #include <test_assert.h>
 
-namespace exp = std::experimental;
+namespace std {
+
+inline namespace Cpp17 {
+
+enum class byte : unsigned char { };
+
+namespace pmr {
+
+struct memory_resource
+{
+    bool is_equal(const memory_resource& other) const noexcept
+        { return do_is_equal(other); }
+protected:
+    virtual bool do_is_equal(const memory_resource& other) const noexcept = 0;
+};
+
+bool operator==(const memory_resource& a, const memory_resource& b)
+{
+    return a.is_equal(b);
+}
+
+bool operator!=(const memory_resource& a, const memory_resource& b)
+{
+    return ! (a == b);
+}
+
+} // close namespace pmr
+} // close namespace Cpp17
+
+inline namespace Cpp20 {
+namespace pmr {
+using namespace Cpp17::pmr;
+
+template <class T = std::byte>
+class polymorphic_allocator {
+    memory_resource *p_rsrc;
+public:
+    polymorphic_allocator(memory_resource *r) : p_rsrc(r) { }
+
+    memory_resource *resource() const { return p_rsrc; }
+};
+
+template <class T1, class T2>
+bool operator==(const polymorphic_allocator<T1>& a1,
+                const polymorphic_allocator<T2>& a2) {
+    return *a1.resource() == *a2.resource();
+}
+
+template <class T1, class T2>
+bool operator!=(const polymorphic_allocator<T1>& a1,
+                const polymorphic_allocator<T2>& a2) {
+    return ! (a1 == a2);
+}
+
+} // close namespace pmr
+} // close namespace Cpp20
+} // close namespace std
+
+namespace exp = std::Cpp20;
 namespace pmr = exp::pmr;
-namespace internal = exp::fundamentals_v3::internal;
+namespace internal = exp::internal;
 
 // STL-style test allocator (doesn't meet the Allocator requirements, but
 // that's not important for this test).
@@ -72,6 +130,8 @@ class EraseAlloc
 {
 };
 
+using PolyAlloc = pmr::polymorphic_allocator<>;
+
 template <typename Alloc>
 class TestTypeBase {
 protected:
@@ -101,21 +161,25 @@ public:
 };
 
 template <>
-class TestTypeBase<pmr::memory_resource*>
+class TestTypeBase<PolyAlloc>
 {
 protected:
-    typedef pmr::memory_resource* AllocType;
+    typedef pmr::polymorphic_allocator<> AllocType;
     AllocType m_alloc;
     TestTypeBase() : m_alloc(&DefaultResource) { }
     TestTypeBase(const AllocType& a) : m_alloc(a) { }
     TestTypeBase(const TestTypeBase& other) : m_alloc(&DefaultResource) { }
 public:
     typedef AllocType allocator_type;
-    AllocType get_memory_resource() const { return m_alloc; }
+    allocator_type get_allocator() const { return m_alloc; }
+
     template <typename A2>
     bool match_allocator(const A2&) const { return false; }
+    template <typename T2>
+    bool match_allocator(const pmr::polymorphic_allocator<T2>& a2) const
+        { return a2 == m_alloc; }
     bool match_resource(pmr::memory_resource* r) const
-        { return *r == *m_alloc; }
+        { return *r == *m_alloc.resource(); }
 };
 
 template <>
@@ -152,8 +216,9 @@ protected:
     TestTypeBase(const AllocType& a) : m_alloc(a) { }
 
 public:
-    typedef AllocType allocator_type;
-    pmr::memory_resource* get_memory_resource() const
+    typedef pmr::polymorphic_allocator<> allocator_type;
+
+    allocator_type get_allocator() const
         { return m_alloc.m_resource_p; }
     template <typename A2>
     bool match_allocator(const A2& a2) const
@@ -166,8 +231,8 @@ public:
 // Alloc should be one of:
 //    NoAlloc          (no allocator)
 //    MySTLAlloc<int>  (STL-style allocator)
-//    memory_resource* (polymorphic resource)
-//    EraseAlloc       (type-erased allocator/resource)
+//    PolyAlloc        (polymorphic allocator)
+//    EraseAlloc       (type-erased allocator)
 // Prefix is either
 //    false (allocator is supplied at end of ctor args)
 //    true  (allocator is supplied after `allocator_arg` at start of ctor args
@@ -207,6 +272,11 @@ public:
 
     int value() const { return m_value; }
 };
+
+namespace std {
+    template <class Alloc, bool Prefix>
+    struct uses_allocator<TestType<EraseAlloc, Prefix>, Alloc> : true_type {};
+}
 
 template <typename Alloc, bool Prefix = false>
 bool operator==(const TestType<Alloc, Prefix>& a,
@@ -319,18 +389,21 @@ struct match_tuple_element2_imp<I, J, T, Tuple, false>
     }
 };
 
-// Returns true if the `I`th element of a tuple `tpl` is of type exactly
-// matching the specified template parameter type `T` and has a value that
-// compares equal to the specified `value`; otherwise returns false.
-// If `I` is out of bounds, compiles correctly and always returns false.
+// Returns true if the `J`th element of the `I`th subtuple of a tuple `tpl` is
+// of type exactly matching the specified template parameter type `T` and has
+// a value that compares equal to the specified `value`; otherwise returns
+// false.  If `I` or `J` is out of bounds or if the `I`th element of `tpl` is
+// not a (sub)tuple, compiles correctly and always returns false.
 template <std::size_t I, std::size_t J, typename T, typename Tuple, typename U>
 bool match_tuple_element2(const Tuple& tpl, const U& value) {
     return match_tuple_element2_imp<I, J, T, Tuple>::match_value(tpl, value);
 }
 
-// Returns true if the `I`th element of a tuple `tpl` is of type exactly
-// matching the specified template parameter type `T` otherwise returns false.
-// If `I` is out of bounds, compiles correctly and always returns false.
+// Returns true if the `J`th element of the `I`th subtuple of a tuple `tpl` is
+// of type exactly matching the specified template parameter type `T`;
+// otherwise returns false.  If `I` or `J` is out of bounds or if the `I`th
+// element of `tpl` is not a (sub)tuple, compiles correctly and always returns
+// false.
 template <std::size_t I, std::size_t J, typename T, typename Tuple>
 bool match_tuple_element2(const Tuple& tpl) {
     return match_tuple_element2_imp<I, J, T, Tuple>::match_type;
@@ -365,7 +438,7 @@ void runTest()
     TEST_ASSERT(usesAlloc   == (std::uses_allocator<Obj, CharAlloc>::value));
     TEST_ASSERT(usesMemRsrc == (std::uses_allocator<Obj, pmr_ptr>::value));
 
-    // Test with allocator
+    // Test with allocator only
     {
         auto args = exp::uses_allocator_construction_args<Obj>(A1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
@@ -377,16 +450,10 @@ void runTest()
         TEST_ASSERT(PrefixAlloc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.value());
         TEST_ASSERT(usesAlloc == V.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(0 == pW->value());
-        TEST_ASSERT(usesAlloc == pW->match_allocator(A1));
-        TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(A1);
         TEST_ASSERT(0 == X.value());
@@ -416,16 +483,10 @@ void runTest()
         TEST_ASSERT(PrefixAlloc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(val == V.value());
         TEST_ASSERT(usesAlloc == V.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(val == pW->value());
-        TEST_ASSERT(usesAlloc == pW->match_allocator(A1));
-        TEST_ASSERT((!usesAlloc && usesMemRsrc) == pW->match_resource(pR0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(A1, 7);
         TEST_ASSERT(7 == X.value());
@@ -452,16 +513,10 @@ void runTest()
         TEST_ASSERT(PrefixRsrc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.value());
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(0 == pW->value());
-        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR1));
-        TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(pR1);
         TEST_ASSERT(0 == X.value());
@@ -491,16 +546,10 @@ void runTest()
         TEST_ASSERT(PrefixRsrc ==
                     (match_tuple_element<0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(val == V.value());
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(val == pW->value());
-        TEST_ASSERT(usesMemRsrc == pW->match_resource(pR1));
-        TEST_ASSERT((!usesMemRsrc && usesAlloc) == pW->match_allocator(A0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(pR1, 7);
         TEST_ASSERT(7 == X.value());
@@ -515,6 +564,9 @@ void runTest()
         pY->~Obj();
     }
 }
+
+template <class T, bool = false> struct PrintType;
+template <class T> struct PrintType<T, true> { };
 
 template <class Alloc1, bool Prefix1, bool usesAlloc1, bool usesMemRsrc1,
           class Alloc2, bool Prefix2, bool usesAlloc2, bool usesMemRsrc2>
@@ -560,24 +612,15 @@ void runPairTest()
 
     // Test with no constructor arguments
     {
-        auto args = std::tuple<>();
+        auto args = std::tuple<>{};
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.first.value());
         TEST_ASSERT(0 == V.second.value());
         TEST_ASSERT(usesAlloc1 == V.first.match_allocator(A0));
         TEST_ASSERT(usesAlloc2 == V.second.match_allocator(A0));
         TEST_ASSERT(usesMemRsrc1 == V.first.match_resource(pR0));
         TEST_ASSERT(usesMemRsrc2 == V.second.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(0 == pW->first.value());
-        TEST_ASSERT(0 == pW->second.value());
-        TEST_ASSERT(usesAlloc1 == pW->first.match_allocator(A0));
-        TEST_ASSERT(usesAlloc2 == pW->second.match_allocator(A0));
-        TEST_ASSERT(usesMemRsrc1 == pW->first.match_resource(pR0));
-        TEST_ASSERT(usesMemRsrc2 == pW->second.match_resource(pR0));
-        pW->~Obj();
     }
 
     // Test with values.
@@ -586,25 +629,16 @@ void runPairTest()
         TEST_ASSERT((match_tuple_element<0, int&&>(args, val1)));
         TEST_ASSERT((match_tuple_element<1, short>(args, val2)));
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(val1 == V.first.value());
         TEST_ASSERT(val2 == V.second.value());
         TEST_ASSERT(usesAlloc1 == V.first.match_allocator(A0));
         TEST_ASSERT(usesAlloc2 == V.second.match_allocator(A0));
         TEST_ASSERT(usesMemRsrc1 == V.first.match_resource(pR0));
         TEST_ASSERT(usesMemRsrc2 == V.second.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(val1 == pW->first.value());
-        TEST_ASSERT(val2 == pW->second.value());
-        TEST_ASSERT(usesAlloc1 == pW->first.match_allocator(A0));
-        TEST_ASSERT(usesAlloc2 == pW->second.match_allocator(A0));
-        TEST_ASSERT(usesMemRsrc1 == pW->first.match_resource(pR0));
-        TEST_ASSERT(usesMemRsrc2 == pW->second.match_resource(pR0));
-        pW->~Obj();
     }
 
-    // Test with allocator
+    // Test with allocator only
     {
         auto args = exp::uses_allocator_construction_args<Obj>(A1);
         const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
@@ -626,7 +660,7 @@ void runPairTest()
         TEST_ASSERT(PrefixAlloc2 ==
                     (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.first.value());
         TEST_ASSERT(0 == V.second.value());
         TEST_ASSERT(usesAlloc1 == V.first.match_allocator(A1));
@@ -635,17 +669,6 @@ void runPairTest()
                     V.first.match_resource(pR0));
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
                     V.second.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(0 == pW->first.value());
-        TEST_ASSERT(0 == pW->second.value());
-        TEST_ASSERT(usesAlloc1 == pW->first.match_allocator(A1));
-        TEST_ASSERT(usesAlloc2 == pW->second.match_allocator(A1));
-        TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
-                    pW->first.match_resource(pR0));
-        TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
-                    pW->second.match_resource(pR0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(A1);
         TEST_ASSERT(0 == X.first.value());
@@ -686,6 +709,7 @@ void runPairTest()
         const std::size_t allocArg1 = PrefixAlloc1 ? 1 : expNumArgs1 - 1;
         const std::size_t allocArg2 = PrefixAlloc2 ? 1 : expNumArgs2 - 1;
 
+        PrintType<decltype(args), !usesAlloc>();
         if (usesAlloc)
         {
             TEST_ASSERT((match_tuple_element2<1, valArg1, int&&>(args, val1)));
@@ -708,7 +732,7 @@ void runPairTest()
         TEST_ASSERT(PrefixAlloc2 ==
                     (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(std::move(args));
+        Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
         TEST_ASSERT(val2 == V.second.value());
         TEST_ASSERT(usesAlloc1 == V.first.match_allocator(A1));
@@ -717,18 +741,6 @@ void runPairTest()
                     V.first.match_resource(pR0));
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
                     V.second.match_resource(pR0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj,
-                                                          std::move(args));
-        TEST_ASSERT(val1 == pW->first.value());
-        TEST_ASSERT(val2 == pW->second.value());
-        TEST_ASSERT(usesAlloc1 == pW->first.match_allocator(A1));
-        TEST_ASSERT(usesAlloc2 == pW->second.match_allocator(A1));
-        TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
-                    pW->first.match_resource(pR0));
-        TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
-                    pW->second.match_resource(pR0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(A1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
@@ -792,7 +804,7 @@ void runPairTest()
         TEST_ASSERT(PrefixAlloc2 ==
                     (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(std::move(args));
+        Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
         TEST_ASSERT(val2 == V.second.value());
         TEST_ASSERT(usesAlloc1 == V.first.match_allocator(A1));
@@ -802,19 +814,79 @@ void runPairTest()
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
                     V.second.match_resource(pR0));
 
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj,
-                                                          std::move(args));
-        TEST_ASSERT(val1 == pW->first.value());
-        TEST_ASSERT(val2 == pW->second.value());
-        TEST_ASSERT(usesAlloc1 == pW->first.match_allocator(A1));
-        TEST_ASSERT(usesAlloc2 == pW->second.match_allocator(A1));
+        Obj X = exp::make_using_allocator<Obj>(A1, val);
+        TEST_ASSERT(val1 == X.first.value());
+        TEST_ASSERT(val2 == X.second.value());
+        TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
+        TEST_ASSERT(usesAlloc2 == X.second.match_allocator(A1));
         TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
-                    pW->first.match_resource(pR0));
+                    X.first.match_resource(pR0));
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
-                    pW->second.match_resource(pR0));
-        pW->~Obj();
+                    X.second.match_resource(pR0));
 
-        Obj X = exp::make_using_allocator<Obj>(A1, std::move(val1), val2);
+        Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
+                                                               A1, val);
+        TEST_ASSERT(val1 == pY->first.value());
+        TEST_ASSERT(val2 == pY->second.value());
+        TEST_ASSERT(usesAlloc1 == pY->first.match_allocator(A1));
+        TEST_ASSERT(usesAlloc2 == pY->second.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
+                    pY->first.match_resource(pR0));
+        TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
+                    pY->second.match_resource(pR0));
+        pY->~Obj();
+    }
+
+    // Test with allocator and rvalue pair value.
+    {
+        auto args = exp::uses_allocator_construction_args<Obj>(A1,
+                                                               std::move(val));
+        const std::size_t numArgs = std::tuple_size<decltype(args)>::value;
+        const std::size_t expNumArgs  = usesAlloc ? 3 : 1;
+        TEST_ASSERT(expNumArgs == numArgs);
+
+        const std::size_t expNumArgs1 = usesAlloc1 ? (Prefix1 ? 3 : 2) : 1;
+        const std::size_t expNumArgs2 = usesAlloc2 ? (Prefix2 ? 3 : 2) : 1;
+        const std::size_t valArg1 = PrefixAlloc1 ? expNumArgs1 - 1 : 0;
+        const std::size_t valArg2 = PrefixAlloc2 ? expNumArgs2 - 1 : 0;
+        const std::size_t allocArg1 = PrefixAlloc1 ? 1 : expNumArgs1 - 1;
+        const std::size_t allocArg2 = PrefixAlloc2 ? 1 : expNumArgs2 - 1;
+
+        if (usesAlloc)
+        {
+            TEST_ASSERT((match_tuple_element2<1, valArg1, const int&>(args,
+                                                                      val1)));
+            TEST_ASSERT((match_tuple_element2<2, valArg2, const short&>(args,
+                                                                      val2)));
+        }
+        else
+        {
+            TEST_ASSERT((match_tuple_element<0, pair<int, short>&&>(args,
+                                                                    val)));
+        }
+
+        TEST_ASSERT(usesAlloc1 ==
+                    (match_tuple_element2<1, allocArg1,const IntAlloc&>(args,
+                                                                        A1)));
+        TEST_ASSERT(usesAlloc2 ==
+                    (match_tuple_element2<2, allocArg2,const IntAlloc&>(args,
+                                                                        A1)));
+        TEST_ASSERT(PrefixAlloc1 ==
+                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+        TEST_ASSERT(PrefixAlloc2 ==
+                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+
+        Obj V = std::make_from_tuple<Obj>(std::move(args));
+        TEST_ASSERT(val1 == V.first.value());
+        TEST_ASSERT(val2 == V.second.value());
+        TEST_ASSERT(usesAlloc1 == V.first.match_allocator(A1));
+        TEST_ASSERT(usesAlloc2 == V.second.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
+                    V.first.match_resource(pR0));
+        TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
+                    V.second.match_resource(pR0));
+
+        Obj X = exp::make_using_allocator<Obj>(A1, std::make_pair(val1, val2));
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -826,8 +898,7 @@ void runPairTest()
 
         Obj *pY = exp::uninitialized_construct_using_allocator(pUninitObj,
                                                                A1,
-                                                               std::move(val1),
-                                                               val2);
+                                                               std::move(val));
         TEST_ASSERT(val1 == pY->first.value());
         TEST_ASSERT(val2 == pY->second.value());
         TEST_ASSERT(usesAlloc1 == pY->first.match_allocator(A1));
@@ -861,7 +932,7 @@ void runPairTest()
         TEST_ASSERT(PrefixRsrc2 ==
                     (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(args);
+        Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.first.value());
         TEST_ASSERT(0 == V.second.value());
         TEST_ASSERT(usesMemRsrc1 == V.first.match_resource(pR1));
@@ -870,17 +941,6 @@ void runPairTest()
                     V.first.match_allocator(A0));
         TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
                     V.second.match_allocator(A0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj, args);
-        TEST_ASSERT(0 == pW->first.value());
-        TEST_ASSERT(0 == pW->second.value());
-        TEST_ASSERT(usesMemRsrc1 == pW->first.match_resource(pR1));
-        TEST_ASSERT(usesMemRsrc2 == pW->second.match_resource(pR1));
-        TEST_ASSERT((!usesMemRsrc1 && usesAlloc1) ==
-                    pW->first.match_allocator(A0));
-        TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
-                    pW->second.match_allocator(A0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(pR1);
         TEST_ASSERT(0 == X.first.value());
@@ -943,7 +1003,7 @@ void runPairTest()
         TEST_ASSERT(PrefixRsrc2 ==
                     (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(std::move(args));
+        Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
         TEST_ASSERT(val2 == V.second.value());
         TEST_ASSERT(usesMemRsrc1 == V.first.match_resource(pR1));
@@ -952,18 +1012,6 @@ void runPairTest()
                     V.first.match_allocator(A0));
         TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
                     V.second.match_allocator(A0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj,
-                                                          std::move(args));
-        TEST_ASSERT(val1 == pW->first.value());
-        TEST_ASSERT(val2 == pW->second.value());
-        TEST_ASSERT(usesMemRsrc1 == pW->first.match_resource(pR1));
-        TEST_ASSERT(usesMemRsrc2 == pW->second.match_resource(pR1));
-        TEST_ASSERT((!usesMemRsrc1 && usesAlloc1) ==
-                    pW->first.match_allocator(A0));
-        TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
-                    pW->second.match_allocator(A0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(pR1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
@@ -1027,7 +1075,7 @@ void runPairTest()
         TEST_ASSERT(PrefixRsrc2 ==
                     (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
 
-        Obj V = exp::make_from_tuple<Obj>(std::move(args));
+        Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
         TEST_ASSERT(val2 == V.second.value());
         TEST_ASSERT(usesMemRsrc1 == V.first.match_resource(pR1));
@@ -1036,18 +1084,6 @@ void runPairTest()
                     V.first.match_allocator(A0));
         TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
                     V.second.match_allocator(A0));
-
-        Obj *pW = exp::uninitialized_construct_from_tuple(pUninitObj,
-                                                          std::move(args));
-        TEST_ASSERT(val1 == pW->first.value());
-        TEST_ASSERT(val2 == pW->second.value());
-        TEST_ASSERT(usesMemRsrc1 == pW->first.match_resource(pR1));
-        TEST_ASSERT(usesMemRsrc2 == pW->second.match_resource(pR1));
-        TEST_ASSERT((!usesMemRsrc1 && usesAlloc1) ==
-                    pW->first.match_allocator(A0));
-        TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
-                    pW->second.match_allocator(A0));
-        pW->~Obj();
 
         Obj X = exp::make_using_allocator<Obj>(pR1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
@@ -1073,6 +1109,45 @@ void runPairTest()
                     pY->second.match_allocator(A0));
         pY->~Obj();
     }
+
+    // Nested pair, allocator only
+    {
+        typedef pair<Elem1, pair<Elem1, Elem2>>        Obj;
+
+        Obj X = exp::make_using_allocator<Obj>(A1);
+        TEST_ASSERT(0 == X.first.value());
+        TEST_ASSERT(0 == X.second.first.value());
+        TEST_ASSERT(0 == X.second.second.value());
+        TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
+        TEST_ASSERT(usesAlloc1 == X.second.first.match_allocator(A1));
+        TEST_ASSERT(usesAlloc2 == X.second.second.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
+                    X.first.match_resource(pR0));
+        TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
+                    X.second.first.match_resource(pR0));
+        TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
+                    X.second.second.match_resource(pR0));
+    }
+
+    // Nested pair, with allocator and two values.
+    {
+        typedef pair<pair<Elem1, Elem2>, Elem2>        Obj;
+
+        Obj X = exp::make_using_allocator<Obj>(A1, std::make_pair(val1,val2),
+                                               val2);
+        TEST_ASSERT(val1 == X.first.first.value());
+        TEST_ASSERT(val2 == X.first.second.value());
+        TEST_ASSERT(val2 == X.second.value());
+        TEST_ASSERT(usesAlloc1 == X.first.first.match_allocator(A1));
+        TEST_ASSERT(usesAlloc2 == X.first.second.match_allocator(A1));
+        TEST_ASSERT(usesAlloc2 == X.second.match_allocator(A1));
+        TEST_ASSERT((!usesAlloc1 && usesMemRsrc1) ==
+                    X.first.first.match_resource(pR0));
+        TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
+                    X.first.second.match_resource(pR0));
+        TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
+                    X.second.match_resource(pR0));
+    }
 }
 
 
@@ -1090,8 +1165,8 @@ int main()
     TEST(NoAlloc,    0, 0, 0);
     TEST(IntAlloc,   0, 1, 0);
     TEST(IntAlloc,   1, 1, 0);
-    TEST(pmr_ptr,    0, 0, 1);
-    TEST(pmr_ptr,    1, 0, 1);
+    TEST(PolyAlloc,  0, 0, 1);
+    TEST(PolyAlloc,  1, 0, 1);
     TEST(EraseAlloc, 0, 1, 1);
     TEST(EraseAlloc, 1, 1, 1);
 
@@ -1107,27 +1182,27 @@ int main()
     PAIR_TEST(NoAlloc,    0, 0, 0, NoAlloc,    0, 0, 0);
     PAIR_TEST(NoAlloc,    0, 0, 0, IntAlloc,   0, 1, 0);
     PAIR_TEST(NoAlloc,    0, 0, 0, IntAlloc,   1, 1, 0);
-    PAIR_TEST(NoAlloc,    0, 0, 0, pmr_ptr,    0, 0, 1);
-    PAIR_TEST(NoAlloc,    0, 0, 0, pmr_ptr,    1, 0, 1);
+    PAIR_TEST(NoAlloc,    0, 0, 0, PolyAlloc,  0, 0, 1);
+    PAIR_TEST(NoAlloc,    0, 0, 0, PolyAlloc,  1, 0, 1);
     PAIR_TEST(NoAlloc,    0, 0, 0, EraseAlloc, 0, 1, 1);
     PAIR_TEST(NoAlloc,    0, 0, 0, EraseAlloc, 1, 1, 1);
 
     PAIR_TEST(IntAlloc,   0, 1, 0, NoAlloc,    0, 0, 0);
     PAIR_TEST(IntAlloc,   1, 1, 0, NoAlloc,    0, 0, 0);
     PAIR_TEST(IntAlloc,   1, 1, 0, IntAlloc,   0, 1, 0);
-    PAIR_TEST(IntAlloc,   0, 1, 0, pmr_ptr,    0, 0, 1);
+    PAIR_TEST(IntAlloc,   0, 1, 0, PolyAlloc,  0, 0, 1);
     PAIR_TEST(IntAlloc,   1, 1, 0, EraseAlloc, 1, 1, 1);
 
-    PAIR_TEST(pmr_ptr,    0, 0, 1, NoAlloc,    0, 0, 0);
-    PAIR_TEST(pmr_ptr,    1, 0, 1, NoAlloc,    0, 0, 0);
-    PAIR_TEST(pmr_ptr,    1, 0, 1, IntAlloc,   1, 1, 0);
-    PAIR_TEST(pmr_ptr,    0, 0, 1, pmr_ptr,    0, 0, 1);
-    PAIR_TEST(pmr_ptr,    0, 0, 1, EraseAlloc, 1, 1, 1);
+    PAIR_TEST(PolyAlloc,  0, 0, 1, NoAlloc,    0, 0, 0);
+    PAIR_TEST(PolyAlloc,  1, 0, 1, NoAlloc,    0, 0, 0);
+    PAIR_TEST(PolyAlloc,  1, 0, 1, IntAlloc,   1, 1, 0);
+    PAIR_TEST(PolyAlloc,  0, 0, 1, PolyAlloc,  0, 0, 1);
+    PAIR_TEST(PolyAlloc,  0, 0, 1, EraseAlloc, 1, 1, 1);
 
     PAIR_TEST(EraseAlloc, 0, 1, 1, NoAlloc,    0, 0, 0);
     PAIR_TEST(EraseAlloc, 1, 1, 1, NoAlloc,    0, 0, 0);
     PAIR_TEST(EraseAlloc, 1, 1, 1, IntAlloc,   0, 1, 0);
-    PAIR_TEST(EraseAlloc, 1, 1, 1, pmr_ptr,    1, 0, 1);
+    PAIR_TEST(EraseAlloc, 1, 1, 1, PolyAlloc,  1, 0, 1);
     PAIR_TEST(EraseAlloc, 0, 1, 1, EraseAlloc, 1, 1, 1);
 
     return errorCount();
