@@ -565,9 +565,6 @@ void runTest()
     }
 }
 
-template <class T, bool = false> struct PrintType;
-template <class T> struct PrintType<T, true> { };
-
 template <class Alloc1, bool Prefix1, bool usesAlloc1, bool usesMemRsrc1,
           class Alloc2, bool Prefix2, bool usesAlloc2, bool usesMemRsrc2>
 void runPairTest()
@@ -709,7 +706,6 @@ void runPairTest()
         const std::size_t allocArg1 = PrefixAlloc1 ? 1 : expNumArgs1 - 1;
         const std::size_t allocArg2 = PrefixAlloc2 ? 1 : expNumArgs2 - 1;
 
-        PrintType<decltype(args), !usesAlloc>();
         if (usesAlloc)
         {
             TEST_ASSERT((match_tuple_element2<1, valArg1, int&&>(args, val1)));
@@ -854,10 +850,10 @@ void runPairTest()
 
         if (usesAlloc)
         {
-            TEST_ASSERT((match_tuple_element2<1, valArg1, const int&>(args,
-                                                                      val1)));
-            TEST_ASSERT((match_tuple_element2<2, valArg2, const short&>(args,
-                                                                      val2)));
+            TEST_ASSERT((match_tuple_element2<1, valArg1, int&&>(args,
+                                                                 val1)));
+            TEST_ASSERT((match_tuple_element2<2, valArg2, short&&>(args,
+                                                                   val2)));
         }
         else
         {

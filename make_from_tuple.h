@@ -8,6 +8,7 @@
 #define INCLUDED_MAKE_FROM_TUPLE_DOT_H
 
 #include <utility>
+#include <tuple>
 #include <cstdlib>
 
 namespace std {

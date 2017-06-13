@@ -136,11 +136,11 @@ Add the following new function templates to `<memory>`:
                       apply([&a](auto&&... args1) -> auto {
                               return uses_allocator_construction_args<T1>(a,
                                      std::forward<decltype(args1)>(args1)...);
-                          }, x),
+                          }, std::forward<Tuple1>(x)),
                       apply([&a](auto&&... args2) -> auto {
                               return uses_allocator_construction_args<T2>(a,
                                      std::forward<decltype(args2)>(args2)...);
-                          }, y));
+                          }, std::forward<Tuple2>(y)));
 
     template <class T>
       auto uses_allocator_construction_args(const Alloc& a) -> see below;

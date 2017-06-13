@@ -106,11 +106,11 @@ auto uses_allocator_args_imp(true_type  /* is_pair */,
                       apply([&a](auto&&... args1) -> auto {
                               return uses_allocator_construction_args<T1>(a,
                                      std::forward<decltype(args1)>(args1)...);
-                          }, x),
+                          }, std::forward<Tuple1>(x)),
                       apply([&a](auto&&... args2) -> auto {
                               return uses_allocator_construction_args<T2>(a,
                                      std::forward<decltype(args2)>(args2)...);
-                          }, y)
+                          }, std::forward<Tuple2>(y))
         );
 }
 
