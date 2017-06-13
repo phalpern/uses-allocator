@@ -1,6 +1,6 @@
-% D0591r2 | Utility functions to implement uses-allocator construction
+% P0591r2 | Utility functions to implement uses-allocator construction
 % Pablo Halpern <phalpern@halpernwightsoftware.com>
-% 2017-06-11 | Target audience: LEWG
+% 2017-06-12 | Target audience: LEWG
 
 Abstract
 ========
@@ -30,6 +30,9 @@ C++20 (aka, C++Next) rather than at a technical specification.
 
 Changes from R1
 ===============
+
+ * Fix bugs in formal wording. Everything in this paper has been implemented
+   and tested (and a link to the implementation added).
 
  * Explicitly called out recursive handling for a `std::pair` containing a
    `std::pair`. (No change to actual functionality from R0.)
@@ -73,17 +76,39 @@ Implementation experience
 =========================
 
 A working implementation of this proposal can be found on GitHub at
-git@github.com:phalpern/uses-allocator.git
+[https://github.com/phalpern/uses-allocator.git](https://github.com/phalpern/uses-allocator.git).
 
 Proposed wording
 ================
 
 Wording is relative to the March 2017 DIS, N4660.
 
+Header `<memory>` synopsis [memory.syn]
+---------------------------------------
+
+Add the following new function templates to the to the `<memory>` synopsis:
+
+    template <class T, class Alloc, class... Args>
+      auto uses_allocator_construction_args(const Alloc& a, Args&&... args) -> see below;
+
+    template <class T, class Alloc, class... Args>
+      T* uninitialized_construct_using_allocator(T* p,
+                                                 const Alloc& a,
+                                                 Args&&... args);
+
+    template <class T, class Alloc, class... Args>
+      T make_using_allocator(const Alloc& a, Args&&... args);
+
+Uses-allocator construction [allocator.uses.construction]
+---------------------------------------------------------
+
+Add the following descriptions to uses-allocator-construction.
+
 **Guidance needed**: The wording below expresses
   `uses_allocator_construction_args` as a bunch of overloads using "does not
   participate in overload-resolution" wording. It could also be expressed as a
-  single (variadic) function with a bunch of special cases called out. Which
+  single (variadic) function with a bunch of special cases called out, or it
+  could be described with less code and more descriptive English.  Which
   is better for comprehending the standard?
 
 **Guidance needed**: The wording uses `forward_as_tuple`, which prevents
@@ -91,8 +116,6 @@ Wording is relative to the March 2017 DIS, N4660.
   in dangling references if the resulting `tuple` outlives the full expression
   in which it was created. Should I repeat the cautionary
   words already found in the description of `forward_as_tuple`?
-
-Add the following new function templates to `<memory>`:
 
     template <class T, class Alloc, class... Args>
       auto uses_allocator_construction_args(const Alloc& a, Args&&... args) -> see below;
@@ -121,10 +144,8 @@ Add the following new function templates to `<memory>`:
     allocator to a constructor. — _end note_]
 
     template <class T, class Alloc, class Tuple1, class Tuple2>
-      auto uses_allocator_construction_args(const Alloc& a,
-                                            piecewise_construct_t,
-                                            Tuple1&& x,
-                                            Tuple2&& y) -> see below;
+      auto uses_allocator_construction_args(const Alloc& a, piecewise_construct_t,
+                                            Tuple1&& x, Tuple2&& y) -> see below;
 
 > _Remark_: `T` is not deduced and must therefore be specified explicitly by
   the caller. This template does not participate in overload resolution unless
@@ -132,7 +153,7 @@ Add the following new function templates to `<memory>`:
 
 > _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
 
-    return make_tuple(piecewise_construct,
+            return make_tuple(piecewise_construct,
                       apply([&a](auto&&... args1) -> auto {
                               return uses_allocator_construction_args<T1>(a,
                                      std::forward<decltype(args1)>(args1)...);
@@ -192,13 +213,12 @@ Add the following new function templates to `<memory>`:
       T make_using_allocator(const Alloc& a, Args&&... args);
 
 > _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution unless
-  `T` is a specialization of `std::pair`.
+  the caller.
 
 > _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
 
-        make_from_tuple<T>(
-            uses_allocator_construction_args<T>(a, forward<Args>(args)...));
+            make_from_tuple<T>(
+                uses_allocator_construction_args<T>(a, forward<Args>(args)...));
 
     template <class T, class Alloc, class... Args>
       T* uninitialized_construct_using_allocator(T* p,
@@ -206,23 +226,27 @@ Add the following new function templates to `<memory>`:
                                                  Args&&... args);
 
 > _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution unless
-  `T` is a specialization of `std::pair`.
+  the caller.
 
 > _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to:
 
-        return apply([p](auto&&... args2){
-                return ::new(static_cast<void*>(p))
-                    T(forward<decltype(args2)>(args2)...);
-            }, uses_allocator_construction_args<T>(a, forward<Args>(args)...));
+            return apply([p](auto&&... args2){
+                    return ::new(static_cast<void*>(p))
+                        T(forward<decltype(args2)>(args2)...);
+                }, uses_allocator_construction_args<T>(a, forward<Args>(args)...));
 
 **Guidance Needed**: Should we consider adding
 `uninitialized_construct_from_tuple` as a separate (non-exposition) function,
 since it appears to be useful and would simplify (or perhaps eliminate the
 need for) `uninitialized_construct_using_allocator`.
 
-Additionally, rewrite the `construct` methods of `polymorphic_allocator` and
-`scoped_allocator_adaptor` to simply call `uninitialized_construct_from_tuple`.
+Changes to `polymorphic_allocator` and `scoped_allocator_adaptor`
+-----------------------------------------------------------------
+
+Rewrite the `construct` methods of `polymorphic_allocator`
+[mem.poly.allocator.mem] and `scoped_allocator_adaptor`
+[allocator.adaptor.members] to simply call
+`uninitialized_construct_from_tuple`.
 
 Consider replacing all uses of _uses allocator construction_ with references
 to these functions and removing  _uses allocator construction_ from the
