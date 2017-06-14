@@ -92,7 +92,7 @@ class NoAlloc
 template <typename Alloc>
 class TestTypeBase {
 protected:
-    typedef Alloc AllocType; // Used in derived class
+    typedef Alloc AllocType;   // Not `allocator_type`. Used in derived class.
     typedef std::allocator_traits<Alloc> AT;
     Alloc m_alloc;
     TestTypeBase() : m_alloc() { }
@@ -101,14 +101,20 @@ protected:
         : m_alloc(AT::select_on_container_copy_construction(other.m_alloc)) { }
     TestTypeBase(TestTypeBase&& other) : m_alloc(other.m_alloc) { }
     void operator=(const TestTypeBase& other) {
+        // This won't compile for allocators that don't have a copy assignment
+        // operator, but it's good enough for this test driver.
         if (AT::propagate_on_container_copy_assignment::value)
             m_alloc = other.m_alloc;
     }
     void operator=(TestTypeBase&& other) {
+        // This won't compile for allocators that don't have a copy assignment
+        // operator, but it's good enough for this test driver.
         if (AT::propagate_on_container_move_assignment::value)
             m_alloc = other.m_alloc;
     }
     void swap(TestTypeBase& other) noexcept {
+        // This won't compile for allocators that can't be swapped,
+        // but it's good enough for this test driver.
         using std::swap;
         if (AT::propagate_on_container_swap::value)
             swap(m_alloc, other.m_alloc);
@@ -124,7 +130,7 @@ template <>
 class TestTypeBase<NoAlloc>
 {
 protected:
-    typedef NoAlloc AllocType;
+    typedef NoAlloc AllocType;  // Not `allocator_type`. Used in derived class.
     TestTypeBase() { }
     TestTypeBase(const AllocType&) { }
     void swap(TestTypeBase& other) noexcept { }
@@ -133,7 +139,8 @@ protected:
 // Template to generate test types.
 // Alloc should be one of:
 //    NoAlloc          (no allocator)
-//    MySTLAlloc<int>  (STL-style allocator)
+//    MySTLAlloc<int>  (STL-style allocator that never propagates)
+//    MyPocAlloc<int>  (STL-style allocator that always propagates)
 // Prefix is either
 //    false (allocator is supplied at end of ctor args)
 //    true  (allocator is supplied after `allocator_arg` at start of ctor args
