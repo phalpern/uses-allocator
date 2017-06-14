@@ -11,6 +11,33 @@
 #include <cassert>
 #include <test_assert.h>
 
+// Some meta-functions for internal testing of test classes
+template <typename T, typename A, typename = std::void_t<>>
+struct uses_prefix_allocator : std::false_type { };
+
+template <typename T, typename A>
+struct uses_prefix_allocator<T,A,std::void_t<decltype(T(std::allocator_arg,
+                                                        std::declval<A>(),
+                                                        std::declval<T>()))>>
+    : std::true_type { };
+
+// template <typename T, typename A, typename V>
+// struct uses_prefix_allocator<T&,A,V> : uses_prefix_allocator<T,A> { };
+
+template <typename T, typename A>
+constexpr bool uses_prefix_allocator_v = uses_prefix_allocator<T,A>::value;
+
+template <typename T, typename A, typename = std::void_t<>>
+struct uses_suffix_allocator : std::false_type { };
+
+template <typename T, typename A>
+struct uses_suffix_allocator<T,A,std::void_t<decltype(T(std::declval<T>(),
+                                                        std::declval<A>()))>>
+    : std::true_type { };
+
+template <typename T, typename A>
+constexpr bool uses_suffix_allocator_v = uses_suffix_allocator<T,A>::value;
+
 // STL-style test allocator (doesn't actually allocate memory, but that's not
 // important for this test).
 template <class T>
@@ -238,8 +265,8 @@ int main()
 
         // Internals testing
         TEST_ASSERT(! internal::has_get_allocator_v<Obj>);
-        TEST_ASSERT(! (internal::uses_suffix_allocator_v<Obj, IntAlloc>));
-        TEST_ASSERT(! (internal::uses_prefix_allocator_v<Obj, IntAlloc>));
+        TEST_ASSERT(! (uses_suffix_allocator_v<Obj, IntAlloc>));
+        TEST_ASSERT(! (uses_prefix_allocator_v<Obj, IntAlloc>));
 
         Obj x(3);
         TEST_ASSERT(3 == x.value());
@@ -291,8 +318,8 @@ int main()
 
         // Internals testing
         TEST_ASSERT(  internal::has_get_allocator_v<Obj>);
-        TEST_ASSERT(  (internal::uses_suffix_allocator_v<Obj, IntAlloc>));
-        TEST_ASSERT(! (internal::uses_prefix_allocator_v<Obj, IntAlloc>));
+        TEST_ASSERT(  (uses_suffix_allocator_v<Obj, IntAlloc>));
+        TEST_ASSERT(! (uses_prefix_allocator_v<Obj, IntAlloc>));
 
         Obj x(3, A1);
         TEST_ASSERT(3 == x.value());
@@ -352,8 +379,8 @@ int main()
 
         // Internals testing
         TEST_ASSERT(  internal::has_get_allocator_v<Obj>);
-        TEST_ASSERT(! (internal::uses_suffix_allocator_v<Obj, IntAlloc>));
-        TEST_ASSERT(  (internal::uses_prefix_allocator_v<Obj, IntAlloc>));
+        TEST_ASSERT(! (uses_suffix_allocator_v<Obj, IntAlloc>));
+        TEST_ASSERT(  (uses_prefix_allocator_v<Obj, IntAlloc>));
 
         Obj x(std::allocator_arg, A1, 3);
         TEST_ASSERT(3 == x.value());
@@ -413,8 +440,8 @@ int main()
 
         // Internals testing
         TEST_ASSERT(  internal::has_get_allocator_v<Obj>);
-        TEST_ASSERT(  (internal::uses_suffix_allocator_v<Obj, IntPocAlloc>));
-        TEST_ASSERT(! (internal::uses_prefix_allocator_v<Obj, IntPocAlloc>));
+        TEST_ASSERT(  (uses_suffix_allocator_v<Obj, IntPocAlloc>));
+        TEST_ASSERT(! (uses_prefix_allocator_v<Obj, IntPocAlloc>));
 
         Obj x(3, PA1);
         TEST_ASSERT(3 == x.value());
@@ -466,8 +493,8 @@ int main()
 
         // Internals testing
         TEST_ASSERT(  internal::has_get_allocator_v<Obj>);
-        TEST_ASSERT(! (internal::uses_suffix_allocator_v<Obj, IntPocAlloc>));
-        TEST_ASSERT(  (internal::uses_prefix_allocator_v<Obj, IntPocAlloc>));
+        TEST_ASSERT(! (uses_suffix_allocator_v<Obj, IntPocAlloc>));
+        TEST_ASSERT(  (uses_prefix_allocator_v<Obj, IntPocAlloc>));
 
         Obj x(std::allocator_arg, PA1, 3);
         TEST_ASSERT(3 == x.value());

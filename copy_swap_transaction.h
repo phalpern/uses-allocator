@@ -12,48 +12,17 @@
 // Feature-test macro
 #define __cpp_lib_experimental_copy_swap_transaction 201707
 
+#include "uses_allocator.h"
 #include <utility>
 #include <memory>
 #include <cstdlib>
 
 namespace std {
 
-inline namespace cpp17 {
-
-template <class...> struct void_t_imp { typedef void type; };
-template <class... T> using void_t = typename void_t_imp<T...>::type;
-
-} // close cpp17
-
 namespace experimental {
 inline namespace fundamentals_v3 {
 
 namespace internal {
-
-template <typename T, typename A, typename = void_t<>>
-struct uses_prefix_allocator : false_type { };
-
-template <typename T, typename A>
-struct uses_prefix_allocator<T,A,void_t<decltype(T(allocator_arg, declval<A>(),
-                                                   declval<T>()))>>
-    : true_type { };
-
-// template <typename T, typename A, typename V>
-// struct uses_prefix_allocator<T&,A,V> : uses_prefix_allocator<T,A> { };
-
-template <typename T, typename A>
-constexpr bool uses_prefix_allocator_v = uses_prefix_allocator<T,A>::value;
-
-template <typename T, typename A, typename = void_t<>>
-struct uses_suffix_allocator : false_type { };
-
-template <typename T, typename A>
-struct uses_suffix_allocator<T,A,void_t<decltype(T(declval<T>(),
-                                                   declval<A>()))>>
-    : true_type { };
-
-template <typename T, typename A>
-constexpr bool uses_suffix_allocator_v = uses_suffix_allocator<T,A>::value;
 
 template <typename T, typename = void_t<>>
 struct has_get_allocator
@@ -66,59 +35,24 @@ struct has_get_allocator<T, void_t<decltype(declval<T>().get_allocator())>>
 template <typename T>
 constexpr bool has_get_allocator_v = has_get_allocator<T>::value;
 
-template <typename Type, typename Alloc>
-inline
-typename enable_if< uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>,
-                   remove_reference_t<Type>>::type
-copy_swap_helper_imp(Type&& other, const Alloc& alloc)
-{
-    typedef remove_reference_t<Type> ObjType;
-    return ObjType(allocator_arg, alloc, std::forward<Type>(other));
-}
-
-template <typename Type, typename Alloc>
-inline
-typename enable_if< uses_suffix_allocator_v<remove_reference_t<Type>,Alloc> &&
-                   !uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>,
-                   remove_reference_t<Type>>::type
-copy_swap_helper_imp(Type&& other, const Alloc& alloc)
-{
-    typedef remove_reference_t<Type> ObjType;
-    return ObjType(std::forward<Type>(other), alloc);
-}
-
-template <typename Type, typename Alloc>
-inline
-typename enable_if<!uses_suffix_allocator_v<remove_reference_t<Type>,Alloc> &&
-                   !uses_prefix_allocator_v<remove_reference_t<Type>,Alloc>,
-                   remove_reference_t<Type>>::type
-copy_swap_helper_imp(Type&& other, const Alloc&)
-{
-    static_assert(! uses_allocator<remove_reference_t<Type>,Alloc>::value,
-                  "Type uses allocator but doesn't have appriate constructor");
-    return std::forward<Type>(other);
-}
-
 } // close internal namespace
 
 template <class T, class U>
 inline
-typename enable_if< internal::has_get_allocator_v<U>,
-                   remove_reference_t<T>>::type
-copy_swap_helper(T&& other, const U& alloc_source)
+enable_if_t<!internal::has_get_allocator_v<U>, remove_reference_t<T>>
+copy_swap_helper(T&& other, const U&)
 {
-    using internal::copy_swap_helper_imp;
-    return copy_swap_helper_imp(std::forward<T>(other),
-                                alloc_source.get_allocator());
+    return std::forward<T>(other);
 }
 
 template <class T, class U>
 inline
-typename enable_if<!internal::has_get_allocator_v<U>,
-                   remove_reference_t<T>>::type
-copy_swap_helper(T&& other, const U& /* alloc_source */)
+enable_if_t<internal::has_get_allocator_v<U>, remove_reference_t<T>>
+copy_swap_helper(T&& other, const U& alloc_donor)
 {
-    return std::forward<T>(other);
+    using TT = remove_reference_t<T>;
+    return make_using_allocator<TT>(alloc_donor.get_allocator(),
+                                    std::forward<T>(other));
 }
 
 template <class T>
@@ -128,7 +62,62 @@ remove_reference_t<T> copy_swap_helper(T&& other)
     return copy_swap_helper(std::forward<T>(other), other);
 }
 
+template <class T>
+inline
+typename enable_if< internal::has_get_allocator_v<T>, T&>::type
+swap_assign(T& lhs, decay_t<T>&& rhs)
+{
+    using Alloc = decltype(lhs.get_allocator());
+    constexpr bool pocma =
+        allocator_traits<Alloc>::propagate_on_container_move_assignment::value;
+    T R = (pocma ? T(std::move(rhs)) :
+           make_using_allocator<T>(lhs.get_allocator(), std::move(rhs)));
+    using std::swap;
+    // If pocma, assume pocs (propagate_on_container_swap)
+    swap(lhs, R);
+    return lhs;
+}
+
+template <class T>
+inline
+typename enable_if<!internal::has_get_allocator_v<T>, T&>::type
+swap_assign(T& lhs, decay_t<T>&& rhs)
+{
+    T R(std::move(rhs));
+    using std::swap;
+    swap(lhs, R);
+    return lhs;
+}
+
+template <class T>
+inline
+typename enable_if< internal::has_get_allocator_v<T>, T&>::type
+swap_assign(T& lhs, decay_t<T> const& rhs)
+{
+    using Alloc = decltype(lhs.get_allocator());
+    constexpr bool pocca =
+        allocator_traits<Alloc>::propagate_on_container_copy_assignment::value;
+    T R = make_using_allocator<T>((pocca ? rhs : lhs).get_allocator(), rhs);
+    using std::swap;
+    // If pocca, assume pocs (propagate_on_container_swap)
+    swap(lhs, R);
+    return lhs;
+}
+
+template <class T>
+inline
+typename enable_if<!internal::has_get_allocator_v<T>, T&>::type
+swap_assign(T& lhs, decay_t<T> const& rhs)
+{
+    T R(rhs);
+    using std::swap;
+    swap(lhs, R);
+    return lhs;
+}
+
+
 namespace internal {
+
 template <class F, class... Args>
 inline
 void
@@ -164,60 +153,6 @@ copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
     swap(t, tprime);
 }
 } // close namespace internal
-
-template <class T>
-inline
-typename enable_if< internal::has_get_allocator_v<T>, T&>::type
-swap_assign(T& lhs, decay_t<T>&& rhs)
-{
-    using internal::copy_swap_helper_imp;
-    typedef decltype(lhs.get_allocator()) Alloc;
-    constexpr bool pocma =
-        allocator_traits<Alloc>::propagate_on_container_move_assignment::value;
-    T R = (pocma ? T(std::move(rhs)) :
-           copy_swap_helper(std::move(rhs), lhs));
-    using std::swap;
-    swap(lhs, R);
-    return lhs;
-}
-
-template <class T>
-inline
-typename enable_if<!internal::has_get_allocator_v<T>,
-                   T&>::type
-swap_assign(T& lhs, decay_t<T>&& rhs)
-{
-    T R = copy_swap_helper(std::move(rhs), lhs);
-    using std::swap;
-    swap(lhs, R);
-    return lhs;
-}
-
-template <class T>
-inline
-typename enable_if< internal::has_get_allocator_v<T>, T&>::type
-swap_assign(T& lhs, decay_t<T> const& rhs)
-{
-    using internal::copy_swap_helper_imp;
-    typedef decltype(lhs.get_allocator()) Alloc;
-    constexpr bool pocca =
-        allocator_traits<Alloc>::propagate_on_container_copy_assignment::value;
-    T R = copy_swap_helper_imp(rhs, (pocca ? rhs : lhs).get_allocator());
-    using std::swap;
-    swap(lhs, R);
-    return lhs;
-}
-
-template <class T>
-inline
-typename enable_if<!internal::has_get_allocator_v<T>, T&>::type
-swap_assign(T& lhs, decay_t<T> const& rhs)
-{
-    T R(rhs);
-    using std::swap;
-    swap(lhs, R);
-    return lhs;
-}
 
 template <class T, class... Rest>
 inline
