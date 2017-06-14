@@ -1,16 +1,16 @@
-/* copy_swap_helper.h                  -*-C++-*-
+/* copy_swap_transaction.h                  -*-C++-*-
  *
  * Copyright (C) 2016 Pablo Halpern <phalpern@halpernwightsoftware.com>
  * Distributed under the Boost Software License - Version 1.0
  *
- * Implementation of P0208 Copy-Swap Helper
+ * Implementation of P0208 Copy-Swap Transaction
  */
 
-#ifndef INCLUDED_COPY_SWAP_HELPER_DOT_H
-#define INCLUDED_COPY_SWAP_HELPER_DOT_H
+#ifndef INCLUDED_COPY_SWAP_TRANSACTION_DOT_H
+#define INCLUDED_COPY_SWAP_TRANSACTION_DOT_H
 
 // Feature-test macro
-#define __cpp_lib_experimental_copy_swap_helper 201602
+#define __cpp_lib_experimental_copy_swap_transaction 201707
 
 #include <utility>
 #include <memory>
@@ -99,42 +99,6 @@ copy_swap_helper_imp(Type&& other, const Alloc&)
     return std::forward<Type>(other);
 }
 
-template <class F, class... Args>
-inline
-auto
-copy_swap_transaction_imp(integral_constant<size_t, 0>, F&& f, Args&... args)
-{
-    // First argument is zero integral constant.
-    // Terminate template recursion by actually calling `f`.
-    // Note that `args` is a list of lvalue references, so it would be wrong
-    // to use `std::forward<Args>`.
-    return std::forward<F>(f)(args...);
-}
-
-template <size_t N, class T, class... Rest>
-inline
-auto
-copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
-{
-    // First argument is non-zero integral constant.
-    // There is at least one argument before the invokable function.
-
-    // Make a copy of `t` using `t`s allocator, even if `T` doesn't usually
-    // propagate it's allocator on copy construction. If `T` doesn't use an
-    // allocator, then `copy_swap_helper(t)` simply returns `t`.
-    T tprime(copy_swap_helper(t));
-
-    // Remove `t` from front of argument list and add rotate left by adding
-    // `tprime` to the end of the list, then recurse.
-    auto ret = copy_swap_transaction_imp(integral_constant<size_t, N-1>(),
-                                         std::forward<Rest>(rest)..., tprime);
-
-    // Transaction complete. Commit changes back to `t`.
-    using std::swap;
-    swap(t, tprime);
-    return ret;
-}
-
 } // close internal namespace
 
 template <class T, class U>
@@ -163,6 +127,43 @@ remove_reference_t<T> copy_swap_helper(T&& other)
 {
     return copy_swap_helper(std::forward<T>(other), other);
 }
+
+namespace internal {
+template <class F, class... Args>
+inline
+void
+copy_swap_transaction_imp(integral_constant<size_t, 0>, F&& f, Args&... args)
+{
+    // First argument is zero integral constant.
+    // Terminate template recursion by actually calling `f`.
+    // Note that `args` is a list of lvalue references, so it would be wrong
+    // to use `std::forward<Args>`.
+    std::forward<F>(f)(args...);
+}
+
+template <size_t N, class T, class... Rest>
+inline
+void
+copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
+{
+    // First argument is non-zero integral constant.
+    // There is at least one argument before the invokable function.
+
+    // Make a copy of `t` using `t`s allocator, even if `T` doesn't usually
+    // propagate it's allocator on copy construction. If `T` doesn't use an
+    // allocator, then `copy_swap_helper(t)` simply returns `t`.
+    T tprime(copy_swap_helper(t));
+
+    // Remove `t` from front of argument list and add rotate left by adding
+    // `tprime` to the end of the list, then recurse.
+    copy_swap_transaction_imp(integral_constant<size_t, N-1>(),
+                              std::forward<Rest>(rest)..., tprime);
+
+    // Transaction complete. Commit changes back to `t`.
+    using std::swap;
+    swap(t, tprime);
+}
+} // close namespace internal
 
 template <class T>
 inline
@@ -212,24 +213,24 @@ inline
 typename enable_if<!internal::has_get_allocator_v<T>, T&>::type
 swap_assign(T& lhs, decay_t<T> const& rhs)
 {
-    T R = copy_swap_helper(rhs, lhs);
+    T R(rhs);
     using std::swap;
     swap(lhs, R);
     return lhs;
 }
 
-template <class T, class R1, class... Rest>
+template <class T, class... Rest>
 inline
-auto copy_swap_transaction(T& t, R1&& r1, Rest&&... rest)
+bool copy_swap_transaction(T& t, Rest&&... rest)
 {
-    return internal::
-    copy_swap_transaction_imp(integral_constant<size_t, 1 + sizeof...(Rest)>(),
-                              t, std::forward<R1>(r1),
-                              std::forward<Rest>(rest)...);
+    integral_constant<size_t, sizeof...(Rest)> num_args_token;
+
+    internal::copy_swap_transaction_imp(num_args_token, t,
+                                        std::forward<Rest>(rest)...);
 }
 
 } // close fundamentals_v3
 } // close experimental
 } // close std
 
-#endif // ! defined(INCLUDED_COPY_SWAP_HELPER_DOT_H)
+#endif // ! defined(INCLUDED_COPY_SWAP_TRANSACTION_DOT_H)

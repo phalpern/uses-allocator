@@ -1,10 +1,10 @@
-/* copy_swap_helper.t.cpp                  -*-C++-*-
+/* copy_swap_transaction.t.cpp                  -*-C++-*-
  *
  * Copyright (C) 2016 Pablo Halpern <phalpern@halpernwightsoftware.com>
  * Distributed under the Boost Software License - Version 1.0
  */
 
-#include <copy_swap_helper.h>
+#include <copy_swap_transaction.h>
 
 #include <vector>
 #include <cstdlib>
@@ -191,6 +191,7 @@ public:
     }
 
     int value() const { return m_value; }
+    void value(int v) { m_value = v; }
 };
 
 template <typename Alloc, bool Prefix = false>
@@ -217,6 +218,7 @@ namespace internal = std::experimental::fundamentals_v3::internal;
 
 int main()
 {
+    using std::experimental::copy_swap_transaction;
     using std::experimental::copy_swap_helper;
     using std::experimental::swap_assign;
 
@@ -225,6 +227,12 @@ int main()
     IntAlloc A1(1);
     IntAlloc A2(2);
 
+    typedef MyPocAlloc<int> IntPocAlloc;
+    IntPocAlloc PA0;
+    IntPocAlloc PA1(1);
+    IntPocAlloc PA2(2);
+
+    // Test with no allocator
     {
         typedef TestType<NoAlloc> Obj;
 
@@ -237,19 +245,47 @@ int main()
         TEST_ASSERT(3 == x.value());
         Obj cc(x);  // Testing TestType copy constructor
         TEST_ASSERT(3 == cc.value());
-        Obj y(copy_swap_helper(x));
-        TEST_ASSERT(y == x);
+
+        copy_swap_transaction(x, cc, [&](Obj& xprime, Obj& ccprime) {
+                TEST_ASSERT(xprime == x);
+                TEST_ASSERT(ccprime == cc);
+                xprime.value(4);
+                ccprime.value(6);
+                TEST_ASSERT(xprime != x);
+                TEST_ASSERT(ccprime != cc);
+            });
+        TEST_ASSERT(4 == x.value());
+        TEST_ASSERT(6 == cc.value());
+
+        try {
+            copy_swap_transaction(x, cc, [&](Obj& xprime, Obj& ccprime) {
+                    TEST_ASSERT(xprime == x);
+                    TEST_ASSERT(ccprime == cc);
+                    xprime.value(5);
+                    ccprime.value(7);
+                    TEST_ASSERT(xprime != x);
+                    TEST_ASSERT(ccprime != cc);
+                    throw 0;
+                });
+            TEST_ASSERT(false && "Shouldn't get here");
+        } catch (...) {
+            // No change
+            TEST_ASSERT(4 == x.value());
+            TEST_ASSERT(6 == cc.value());
+        }
+
         Obj z(copy_swap_helper(x, TestType<IntAlloc>(A1)));
         TEST_ASSERT(z == x);
         const Obj q(9);
-        Obj& yr = swap_assign(y, q);
-        TEST_ASSERT(&yr == &y);
-        TEST_ASSERT(y == q);
+        Obj& xr = swap_assign(x, q);
+        TEST_ASSERT(&xr == &x);
+        TEST_ASSERT(x == q);
         Obj& zr = swap_assign(z, Obj(8));
         TEST_ASSERT(&zr == &z);
         TEST_ASSERT(z == Obj(8));
     }
 
+    // Test with non-propagating suffix allocator
     {
         typedef TestType<IntAlloc> Obj;
 
@@ -270,19 +306,39 @@ int main()
         TEST_ASSERT(3 == ca.value());
         TEST_ASSERT(A2 == ca.get_allocator());
 
-        Obj y(copy_swap_helper(x));
-        TEST_ASSERT(y == x);
-        TEST_ASSERT(A1 == y.get_allocator());
+        copy_swap_transaction(x, [&](Obj& xprime) {
+                TEST_ASSERT(xprime == x);
+                TEST_ASSERT(A1 == xprime.get_allocator());
+                xprime.value(4);
+                TEST_ASSERT(xprime != x);
+            });
+        TEST_ASSERT(4 == x.value());
+        TEST_ASSERT(A1 == x.get_allocator());
+
+        try {
+            copy_swap_transaction(x, [&](Obj& xprime) {
+                    TEST_ASSERT(xprime == x);
+                    TEST_ASSERT(A1 == xprime.get_allocator());
+                    xprime.value(5);
+                    TEST_ASSERT(xprime != x);
+                    throw 0;
+                });
+            TEST_ASSERT(false && "Shouldn't get here");
+        } catch (...) {
+            // No change
+            TEST_ASSERT(4 == x.value());
+            TEST_ASSERT(A1 == x.get_allocator());
+        }
 
         const Obj q(9, A2);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
 
-        Obj& yr = swap_assign(y, q);
-        TEST_ASSERT(&yr == &y);
-        TEST_ASSERT(y == q);
-        TEST_ASSERT(A1 == y.get_allocator());
+        Obj& xr = swap_assign(x, q);
+        TEST_ASSERT(&xr == &x);
+        TEST_ASSERT(x == q);
+        TEST_ASSERT(A1 == x.get_allocator());
 
         Obj& zr = swap_assign(z, Obj(8, A1));
         TEST_ASSERT(&zr == &z);
@@ -290,6 +346,7 @@ int main()
         TEST_ASSERT(A2 == z.get_allocator());
     }
 
+    // Test with non-propagating prefix allocator
     {
         typedef TestType<IntAlloc, true> Obj;
 
@@ -310,19 +367,39 @@ int main()
         TEST_ASSERT(3 == ca.value());
         TEST_ASSERT(A2 == ca.get_allocator());
 
-        Obj y(copy_swap_helper(x));
-        TEST_ASSERT(y == x);
-        TEST_ASSERT(A1 == y.get_allocator());
+        copy_swap_transaction(x, [&](Obj& xprime) {
+                TEST_ASSERT(xprime == x);
+                TEST_ASSERT(A1 == xprime.get_allocator());
+                xprime.value(4);
+                TEST_ASSERT(xprime != x);
+            });
+        TEST_ASSERT(4 == x.value());
+        TEST_ASSERT(A1 == x.get_allocator());
+
+        try {
+            copy_swap_transaction(x, [&](Obj& xprime) {
+                    TEST_ASSERT(xprime == x);
+                    TEST_ASSERT(A1 == xprime.get_allocator());
+                    xprime.value(5);
+                    TEST_ASSERT(xprime != x);
+                    throw 0;
+                });
+            TEST_ASSERT(false && "Shouldn't get here");
+        } catch (...) {
+            // No change
+            TEST_ASSERT(4 == x.value());
+            TEST_ASSERT(A1 == x.get_allocator());
+        }
 
         const Obj q(std::allocator_arg, A2, 9);
         Obj z(copy_swap_helper(x, q));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
 
-        Obj& yr = swap_assign(y, q);
-        TEST_ASSERT(&yr == &y);
-        TEST_ASSERT(y == q);
-        TEST_ASSERT(A1 == y.get_allocator());
+        Obj& xr = swap_assign(x, q);
+        TEST_ASSERT(&xr == &x);
+        TEST_ASSERT(x == q);
+        TEST_ASSERT(A1 == x.get_allocator());
 
         Obj& zr = swap_assign(z, Obj(std::allocator_arg, A1, 8));
         TEST_ASSERT(&zr == &z);
@@ -330,9 +407,8 @@ int main()
         TEST_ASSERT(A2 == z.get_allocator());
     }
 
-    // Test propagating allocator with `copy_swap` and `move_swap`
+    // Test with propagating suffix allocator
     {
-        typedef MyPocAlloc<int> IntPocAlloc;
         typedef TestType<IntPocAlloc> Obj;
 
         // Internals testing
@@ -340,13 +416,33 @@ int main()
         TEST_ASSERT(  (internal::uses_suffix_allocator_v<Obj, IntPocAlloc>));
         TEST_ASSERT(! (internal::uses_prefix_allocator_v<Obj, IntPocAlloc>));
 
-        IntPocAlloc PA0;
-        IntPocAlloc PA1(1);
-        IntPocAlloc PA2(2);
-
         Obj x(3, PA1);
         TEST_ASSERT(3 == x.value());
         TEST_ASSERT(PA1 == x.get_allocator());
+
+        copy_swap_transaction(x, [&](Obj& xprime) {
+                TEST_ASSERT(xprime == x);
+                TEST_ASSERT(PA1 == xprime.get_allocator());
+                xprime.value(4);
+                TEST_ASSERT(xprime != x);
+            });
+        TEST_ASSERT(4 == x.value());
+        TEST_ASSERT(PA1 == x.get_allocator());
+
+        try {
+            copy_swap_transaction(x, [&](Obj& xprime) {
+                    TEST_ASSERT(xprime == x);
+                    TEST_ASSERT(PA1 == xprime.get_allocator());
+                    xprime.value(5);
+                    TEST_ASSERT(xprime != x);
+                    throw 0;
+                });
+            TEST_ASSERT(false && "Shouldn't get here");
+        } catch (...) {
+            // No change
+            TEST_ASSERT(4 == x.value());
+            TEST_ASSERT(PA1 == x.get_allocator());
+        }
 
         Obj y(4, PA2);
         TEST_ASSERT(4 == y.value());
@@ -359,6 +455,59 @@ int main()
         TEST_ASSERT(PA2 == x.get_allocator());
 
         Obj &ry = swap_assign(y, Obj(8, PA1));
+        TEST_ASSERT(&ry == &y);
+        TEST_ASSERT(y.value() == 8);
+        TEST_ASSERT(PA1 == y.get_allocator());
+    }
+
+    // Test with propagating prefix allocator
+    {
+        typedef TestType<IntPocAlloc, true> Obj;
+
+        // Internals testing
+        TEST_ASSERT(  internal::has_get_allocator_v<Obj>);
+        TEST_ASSERT(! (internal::uses_suffix_allocator_v<Obj, IntPocAlloc>));
+        TEST_ASSERT(  (internal::uses_prefix_allocator_v<Obj, IntPocAlloc>));
+
+        Obj x(std::allocator_arg, PA1, 3);
+        TEST_ASSERT(3 == x.value());
+        TEST_ASSERT(PA1 == x.get_allocator());
+
+        copy_swap_transaction(x, [&](Obj& xprime) {
+                TEST_ASSERT(xprime == x);
+                TEST_ASSERT(PA1 == xprime.get_allocator());
+                xprime.value(4);
+                TEST_ASSERT(xprime != x);
+            });
+        TEST_ASSERT(4 == x.value());
+        TEST_ASSERT(PA1 == x.get_allocator());
+
+        try {
+            copy_swap_transaction(x, [&](Obj& xprime) {
+                    TEST_ASSERT(xprime == x);
+                    TEST_ASSERT(PA1 == xprime.get_allocator());
+                    xprime.value(5);
+                    TEST_ASSERT(xprime != x);
+                    throw 0;
+                });
+            TEST_ASSERT(false && "Shouldn't get here");
+        } catch (...) {
+            // No change
+            TEST_ASSERT(4 == x.value());
+            TEST_ASSERT(PA1 == x.get_allocator());
+        }
+
+        Obj y(std::allocator_arg, PA2, 4);
+        TEST_ASSERT(4 == y.value());
+        TEST_ASSERT(PA2 == y.get_allocator());
+
+        Obj q(std::allocator_arg, PA2, 9);
+        Obj &rx = swap_assign(x, q);
+        TEST_ASSERT(&rx == &x);
+        TEST_ASSERT(x == q);
+        TEST_ASSERT(PA2 == x.get_allocator());
+
+        Obj &ry = swap_assign(y, Obj(std::allocator_arg, PA1, 8));
         TEST_ASSERT(&ry == &y);
         TEST_ASSERT(y.value() == 8);
         TEST_ASSERT(PA1 == y.get_allocator());

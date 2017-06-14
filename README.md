@@ -31,17 +31,18 @@ directly, but which may contain members that use allocators.
 
  o `make_from_tuple.t.cpp`: Test driver for `make_from_tuple`.
 
-P0208 Copy-swap helper functions
---------------------------------
+P0208 Copy-swap transactions
+----------------------------
 
 This paper proposes utility functions that more cleanly express the copy-swap
 idiom used for exception safety and make the idioms work correctly with
 different allocator propagation traits.
 
- o `P0208-copy_swap_helper.docx`: Text of the paper, in MS Word format.
+ o `P0208-copy_swap_transaction.docx`: Text of the paper, in MS Word format.
 
- o `copy_swap_helper.h`: Implementation of the proposed facilities
+ o `copy_swap_transaction.h`: Implementation of the proposed facilities
 
- o `copy_swap_helper.t.cpp`: Test driver for `copy_swap_helper.h`.
+ o `copy_swap_transaction.t.cpp`: Test driver for `copy_swap_transaction.h`.
 
- o `Makefile`: Type `make copy_swap_helper` to build and run the test driver.
+ o `Makefile`: Type `make copy_swap_transaction` to build and run the test
+   driver.
