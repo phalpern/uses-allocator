@@ -99,6 +99,42 @@ copy_swap_helper_imp(Type&& other, const Alloc&)
     return std::forward<Type>(other);
 }
 
+template <class F, class... Args>
+inline
+auto
+copy_swap_transaction_imp(integral_constant<size_t, 0>, F&& f, Args&... args)
+{
+    // First argument is zero integral constant.
+    // Terminate template recursion by actually calling `f`.
+    // Note that `args` is a list of lvalue references, so it would be wrong
+    // to use `std::forward<Args>`.
+    return std::forward<F>(f)(args...);
+}
+
+template <size_t N, class T, class... Rest>
+inline
+auto
+copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
+{
+    // First argument is non-zero integral constant.
+    // There is at least one argument before the invokable function.
+
+    // Make a copy of `t` using `t`s allocator, even if `T` doesn't usually
+    // propagate it's allocator on copy construction. If `T` doesn't use an
+    // allocator, then `copy_swap_helper(t)` simply returns `t`.
+    T tprime(copy_swap_helper(t));
+
+    // Remove `t` from front of argument list and add rotate left by adding
+    // `tprime` to the end of the list, then recurse.
+    auto ret = copy_swap_transaction_imp(integral_constant<size_t, N-1>(),
+                                         std::forward<Rest>(rest)..., tprime);
+
+    // Transaction complete. Commit changes back to `t`.
+    using std::swap;
+    swap(t, tprime);
+    return ret;
+}
+
 } // close internal namespace
 
 template <class T, class U>
@@ -182,32 +218,11 @@ swap_assign(T& lhs, decay_t<T> const& rhs)
     return lhs;
 }
 
-template <class F, class... Args>
-inline
-auto
-copy_swap_transaction_imp(integral_constant<size_t, 0>, F&& f, Args&... args)
-{
-    return std::forward<F>(f)(args...);
-}
-
-template <size_t N, class T, class... Rest>
-inline
-auto
-copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
-{
-    T tprime(copy_swap_helper(t));
-    auto ret = copy_swap_transaction_imp(integral_constant<size_t, N-1>(),
-                                         std::forward<Rest>(rest)..., tprime);
-    using std::swap;
-    swap(t, tprime);
-    return ret;
-}
-
 template <class T, class R1, class... Rest>
 inline
 auto copy_swap_transaction(T& t, R1&& r1, Rest&&... rest)
 {
-    return
+    return internal::
     copy_swap_transaction_imp(integral_constant<size_t, 1 + sizeof...(Rest)>(),
                               t, std::forward<R1>(r1),
                               std::forward<Rest>(rest)...);
