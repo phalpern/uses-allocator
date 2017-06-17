@@ -19,6 +19,13 @@
 
 namespace std {
 
+inline namespace Cpp17 {
+
+enum class byte : unsigned char { };
+
+} // close namespace Cpp17
+
+
 namespace experimental {
 inline namespace fundamentals_v3 {
 
@@ -37,29 +44,31 @@ constexpr bool has_get_allocator_v = has_get_allocator<T>::value;
 
 } // close internal namespace
 
-template <class T, class U>
+// get_allocator() for types that don't use allocators.
+// Returns the default allocator.
+template <class T>
 inline
-enable_if_t<!internal::has_get_allocator_v<U>, remove_reference_t<T>>
-copy_swap_helper(T&& other, const U&)
+enable_if_t<!internal::has_get_allocator_v<T>, allocator<std::byte>>
+get_allocator(T&&)
 {
-    return std::forward<T>(other);
+    return allocator<byte>{};
 }
 
-template <class T, class U>
+// get_allocator() for types that do use allocators.
+template <class T>
 inline
-enable_if_t<internal::has_get_allocator_v<U>, remove_reference_t<T>>
-copy_swap_helper(T&& other, const U& alloc_donor)
+auto get_allocator(T&& other) ->
+    decltype(std::forward<T>(other).get_allocator())
 {
-    using TT = remove_reference_t<T>;
-    return make_using_allocator<TT>(alloc_donor.get_allocator(),
-                                    std::forward<T>(other));
+    return std::forward<T>(other).get_allocator();
 }
 
 template <class T>
 inline
 remove_reference_t<T> copy_swap_helper(T&& other)
 {
-    return copy_swap_helper(std::forward<T>(other), other);
+    using TT = remove_reference_t<T>;
+    return make_using_allocator<TT>(get_allocator(other), other);
 }
 
 template <class T>

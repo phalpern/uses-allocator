@@ -248,6 +248,8 @@ int main()
     using std::experimental::copy_swap_transaction;
     using std::experimental::copy_swap_helper;
     using std::experimental::swap_assign;
+    using std::experimental::get_allocator;
+    using std::Cpp20::make_using_allocator;
 
     typedef MySTLAlloc<int> IntAlloc;
     IntAlloc A0; // Default
@@ -301,8 +303,9 @@ int main()
             TEST_ASSERT(6 == cc.value());
         }
 
-        Obj z(copy_swap_helper(x, TestType<IntAlloc>(A1)));
+        Obj z(make_using_allocator<Obj>(get_allocator(cc), x));
         TEST_ASSERT(z == x);
+        TEST_ASSERT(std::allocator<std::byte>{} == get_allocator(z));
         const Obj q(9);
         Obj& xr = swap_assign(x, q);
         TEST_ASSERT(&xr == &x);
@@ -358,7 +361,7 @@ int main()
         }
 
         const Obj q(9, A2);
-        Obj z(copy_swap_helper(x, q));
+        Obj z(make_using_allocator<Obj>(get_allocator(q), x));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
 
@@ -419,7 +422,7 @@ int main()
         }
 
         const Obj q(std::allocator_arg, A2, 9);
-        Obj z(copy_swap_helper(x, q));
+        Obj z(make_using_allocator<Obj>(get_allocator(q), x));
         TEST_ASSERT(z == x);
         TEST_ASSERT(A2 == z.get_allocator());
 
