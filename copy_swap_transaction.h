@@ -57,12 +57,15 @@ get_allocator(T&&)
 // get_allocator() for types that do use allocators.
 template <class T>
 inline
-auto get_allocator(T&& other) ->
-    decltype(std::forward<T>(other).get_allocator())
+auto get_allocator(T&& x) ->
+    decltype(std::forward<T>(x).get_allocator())
 {
-    return std::forward<T>(other).get_allocator();
+    return std::forward<T>(x).get_allocator();
 }
 
+#if 0
+// This function is no longer being proposed but, just in case, here's
+// an implementation.
 template <class T>
 inline
 remove_reference_t<T> copy_swap_helper(T&& other)
@@ -70,17 +73,17 @@ remove_reference_t<T> copy_swap_helper(T&& other)
     using TT = remove_reference_t<T>;
     return make_using_allocator<TT>(get_allocator(other), other);
 }
+#endif
 
 template <class T>
 inline
-typename enable_if< internal::has_get_allocator_v<T>, T&>::type
-swap_assign(T& lhs, decay_t<T>&& rhs)
+T& swap_assign(T& lhs, decay_t<T>&& rhs)
 {
-    using Alloc = decltype(lhs.get_allocator());
+    using Alloc = decltype(get_allocator(lhs));
     constexpr bool pocma =
         allocator_traits<Alloc>::propagate_on_container_move_assignment::value;
     T R = (pocma ? T(std::move(rhs)) :
-           make_using_allocator<T>(lhs.get_allocator(), std::move(rhs)));
+           make_using_allocator<T>(get_allocator(lhs), std::move(rhs)));
     using std::swap;
     // If pocma, assume pocs (propagate_on_container_swap)
     swap(lhs, R);
@@ -89,41 +92,17 @@ swap_assign(T& lhs, decay_t<T>&& rhs)
 
 template <class T>
 inline
-typename enable_if<!internal::has_get_allocator_v<T>, T&>::type
-swap_assign(T& lhs, decay_t<T>&& rhs)
+T& swap_assign(T& lhs, decay_t<T> const& rhs)
 {
-    T R(std::move(rhs));
-    using std::swap;
-    swap(lhs, R);
-    return lhs;
-}
-
-template <class T>
-inline
-typename enable_if< internal::has_get_allocator_v<T>, T&>::type
-swap_assign(T& lhs, decay_t<T> const& rhs)
-{
-    using Alloc = decltype(lhs.get_allocator());
+    using Alloc = decltype(get_allocator(lhs));
     constexpr bool pocca =
         allocator_traits<Alloc>::propagate_on_container_copy_assignment::value;
-    T R = make_using_allocator<T>((pocca ? rhs : lhs).get_allocator(), rhs);
+    T R = make_using_allocator<T>(get_allocator(pocca ? rhs : lhs), rhs);
     using std::swap;
     // If pocca, assume pocs (propagate_on_container_swap)
     swap(lhs, R);
     return lhs;
 }
-
-template <class T>
-inline
-typename enable_if<!internal::has_get_allocator_v<T>, T&>::type
-swap_assign(T& lhs, decay_t<T> const& rhs)
-{
-    T R(rhs);
-    using std::swap;
-    swap(lhs, R);
-    return lhs;
-}
-
 
 namespace internal {
 
@@ -150,7 +129,7 @@ copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
     // Make a copy of `t` using `t`s allocator, even if `T` doesn't usually
     // propagate it's allocator on copy construction. If `T` doesn't use an
     // allocator, then `copy_swap_helper(t)` simply returns `t`.
-    T tprime(copy_swap_helper(t));
+    T tprime(make_using_allocator<T>(get_allocator(t), t));
 
     // Remove `t` from front of argument list and add rotate left by adding
     // `tprime` to the end of the list, then recurse.
@@ -163,14 +142,14 @@ copy_swap_transaction_imp(integral_constant<size_t, N>, T& t, Rest&&... rest)
 }
 } // close namespace internal
 
-template <class T, class... Rest>
+template <class T, class... Args>
 inline
-bool copy_swap_transaction(T& t, Rest&&... rest)
+void copy_swap_transaction(T& t, Args&&... args)
 {
-    integral_constant<size_t, sizeof...(Rest)> num_args_token;
+    integral_constant<size_t, sizeof...(Args)> num_args_token;
 
     internal::copy_swap_transaction_imp(num_args_token, t,
-                                        std::forward<Rest>(rest)...);
+                                        std::forward<Args>(args)...);
 }
 
 } // close fundamentals_v3
