@@ -1,6 +1,6 @@
-% P0591r2 | Utility functions to implement uses-allocator construction
+% P0591r3 | Utility functions to implement uses-allocator construction
 % Pablo Halpern <phalpern@halpernwightsoftware.com>
-% 2017-06-12 | Target audience: LEWG
+% 2018-04-02 | Target audience: LWG
 
 Abstract
 ========
@@ -28,6 +28,16 @@ features simpler to describe and future-proof against other changes.
 Because this proposal modifies wording in the standard, it is targeted at
 C++20 (aka, C++Next) rather than at a technical specification.
 
+Changes from R2
+===============
+
+ * Renamed `make_using_allocator` to `make_obj_using_allocator` as per LEWG
+   vote in Jacksonville.
+
+ * Added example of use.
+
+ * Changed audience to LWG after approval by LEWG in Jacksonville, March 2018.
+
 Changes from R1
 ===============
 
@@ -51,7 +61,7 @@ Choosing a direction
 ====================
 
 Originally, I considered proposing a pair of function templates,
-`make_using_allocator<T>(allocator, args...)` and
+`make_obj_using_allocator<T>(allocator, args...)` and
 `uninitialized_construct_using_allocator(ptrToT, allocator,
 args...)`. However, implementation experience with the feature being proposed
 showed that, given a type `T`, an allocator `A`, and an argument list
@@ -62,16 +72,48 @@ implement the above function templates. It occurred to me that exposing this
 category of functions that use `tuple`s to manipulate argument lists in a
 composable fashion.
 
-If the basics of this proposal are accepted by LEWG, there would need to be a
-discussion of exactly what should be standardized. The options are:
+Example
+=======
 
- 1. Standardize the function template that generates a `tuple` of arguments.
- 2. Standardize the function templates that actually construct a `T` from an
-    allocator and list of arguments.
- 3. Both.
+If we are creating a simple wrapper class around an object of type `T`, our
+class might look something like this:
 
-This proposal chooses option 3, but I am open to the other options.
-    
+    template <typename T, class Alloc = std::allocator<T>>
+    class Wrapper {
+      Alloc m_alloc;
+      T     m_data;
+      int   m_meta_data;
+      ...
+    public:
+      using allocator_type = Alloc;
+
+      Wrapper(const T& v, const allocator_type& alloc = {});
+      ...
+    };
+
+This wrapper is intended to work with many types for `T`, including types that
+don't use an allocator at all, types that take an allocator on construction
+using the `allocator_arg` protocol, and types that take an allocator on
+construction as a trailing argument. The constructor for `Wrapper` would thus
+require much metaprogramming in order to handle all of the cases. This
+metaprogramming is already done by implementers of the standard library,
+because it is needed by `scoped_allocator_adaptor` and by
+`pmr::polymorphic_allocator`, but such metaprogramming is beyond the skills of
+most programmers and is time consuming for even those possessing the skills.
+The facilities in this proposal make the task almost trivial.
+The `Wrapper` constructor below takes advantage of the
+`make_obj_using_allocator` function template to construct the `m_data` member
+using the supplied allocator. The allocator will be ignored if `T` does not
+use an allocator or uses an allocator of a different type.
+
+    template <typename T, class Alloc>
+    Wrapper<T,Alloc>::Wrapper(const T& v, const Alloc& alloc)
+      : m_alloc(alloc)
+      , m_data(make_obj_using_allocator<T>(alloc, v))
+      , m_meta_data(0)
+      , etc.
+      { ... }
+      
 Implementation experience
 =========================
 
@@ -97,7 +139,7 @@ Add the following new function templates to the to the `<memory>` synopsis:
                                                  Args&&... args);
 
     template <class T, class Alloc, class... Args>
-      T make_using_allocator(const Alloc& a, Args&&... args);
+      T make_obj_using_allocator(const Alloc& a, Args&&... args);
 
 Uses-allocator construction [allocator.uses.construction]
 ---------------------------------------------------------
@@ -210,7 +252,7 @@ Add the following descriptions to uses-allocator-construction.
   forward_as_tuple(std::forward<V>(pr.second)))`.
 
     template <class T, class Alloc, class... Args>
-      T make_using_allocator(const Alloc& a, Args&&... args);
+      T make_obj_using_allocator(const Alloc& a, Args&&... args);
 
 > _Remark_: `T` is not deduced and must therefore be specified explicitly by
   the caller.

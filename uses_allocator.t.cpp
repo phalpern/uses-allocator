@@ -455,7 +455,7 @@ void runTest()
         TEST_ASSERT(usesAlloc == V.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
 
-        Obj X = exp::make_using_allocator<Obj>(A1);
+        Obj X = exp::make_obj_using_allocator<Obj>(A1);
         TEST_ASSERT(0 == X.value());
         TEST_ASSERT(usesAlloc == X.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == X.match_resource(pR0));
@@ -488,7 +488,7 @@ void runTest()
         TEST_ASSERT(usesAlloc == V.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == V.match_resource(pR0));
 
-        Obj X = exp::make_using_allocator<Obj>(A1, 7);
+        Obj X = exp::make_obj_using_allocator<Obj>(A1, 7);
         TEST_ASSERT(7 == X.value());
         TEST_ASSERT(usesAlloc == X.match_allocator(A1));
         TEST_ASSERT((!usesAlloc && usesMemRsrc) == X.match_resource(pR0));
@@ -518,7 +518,7 @@ void runTest()
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
 
-        Obj X = exp::make_using_allocator<Obj>(pR1);
+        Obj X = exp::make_obj_using_allocator<Obj>(pR1);
         TEST_ASSERT(0 == X.value());
         TEST_ASSERT(usesMemRsrc == X.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == X.match_allocator(A0));
@@ -551,7 +551,7 @@ void runTest()
         TEST_ASSERT(usesMemRsrc == V.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == V.match_allocator(A0));
 
-        Obj X = exp::make_using_allocator<Obj>(pR1, 7);
+        Obj X = exp::make_obj_using_allocator<Obj>(pR1, 7);
         TEST_ASSERT(7 == X.value());
         TEST_ASSERT(usesMemRsrc == X.match_resource(pR1));
         TEST_ASSERT((!usesMemRsrc && usesAlloc) == X.match_allocator(A0));
@@ -667,7 +667,7 @@ void runPairTest()
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
                     V.second.match_resource(pR0));
 
-        Obj X = exp::make_using_allocator<Obj>(A1);
+        Obj X = exp::make_obj_using_allocator<Obj>(A1);
         TEST_ASSERT(0 == X.first.value());
         TEST_ASSERT(0 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -738,7 +738,7 @@ void runPairTest()
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
                     V.second.match_resource(pR0));
 
-        Obj X = exp::make_using_allocator<Obj>(A1, std::move(val1), val2);
+        Obj X = exp::make_obj_using_allocator<Obj>(A1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -810,7 +810,7 @@ void runPairTest()
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
                     V.second.match_resource(pR0));
 
-        Obj X = exp::make_using_allocator<Obj>(A1, val);
+        Obj X = exp::make_obj_using_allocator<Obj>(A1, val);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -882,7 +882,7 @@ void runPairTest()
         TEST_ASSERT((!usesAlloc2 && usesMemRsrc2) ==
                     V.second.match_resource(pR0));
 
-        Obj X = exp::make_using_allocator<Obj>(A1, std::make_pair(val1, val2));
+        Obj X = exp::make_obj_using_allocator<Obj>(A1, std::make_pair(val1, val2));
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesAlloc1 == X.first.match_allocator(A1));
@@ -938,7 +938,7 @@ void runPairTest()
         TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
                     V.second.match_allocator(A0));
 
-        Obj X = exp::make_using_allocator<Obj>(pR1);
+        Obj X = exp::make_obj_using_allocator<Obj>(pR1);
         TEST_ASSERT(0 == X.first.value());
         TEST_ASSERT(0 == X.second.value());
         TEST_ASSERT(usesMemRsrc1 == X.first.match_resource(pR1));
@@ -1009,7 +1009,7 @@ void runPairTest()
         TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
                     V.second.match_allocator(A0));
 
-        Obj X = exp::make_using_allocator<Obj>(pR1, std::move(val1), val2);
+        Obj X = exp::make_obj_using_allocator<Obj>(pR1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesMemRsrc1 == X.first.match_resource(pR1));
@@ -1081,7 +1081,7 @@ void runPairTest()
         TEST_ASSERT((!usesMemRsrc2 && usesAlloc2) ==
                     V.second.match_allocator(A0));
 
-        Obj X = exp::make_using_allocator<Obj>(pR1, std::move(val1), val2);
+        Obj X = exp::make_obj_using_allocator<Obj>(pR1, std::move(val1), val2);
         TEST_ASSERT(val1 == X.first.value());
         TEST_ASSERT(val2 == X.second.value());
         TEST_ASSERT(usesMemRsrc1 == X.first.match_resource(pR1));
@@ -1110,7 +1110,7 @@ void runPairTest()
     {
         typedef pair<Elem1, pair<Elem1, Elem2>>        Obj;
 
-        Obj X = exp::make_using_allocator<Obj>(A1);
+        Obj X = exp::make_obj_using_allocator<Obj>(A1);
         TEST_ASSERT(0 == X.first.value());
         TEST_ASSERT(0 == X.second.first.value());
         TEST_ASSERT(0 == X.second.second.value());
@@ -1129,7 +1129,7 @@ void runPairTest()
     {
         typedef pair<pair<Elem1, Elem2>, Elem2>        Obj;
 
-        Obj X = exp::make_using_allocator<Obj>(A1, std::make_pair(val1,val2),
+        Obj X = exp::make_obj_using_allocator<Obj>(A1, std::make_pair(val1,val2),
                                                val2);
         TEST_ASSERT(val1 == X.first.first.value());
         TEST_ASSERT(val2 == X.first.second.value());

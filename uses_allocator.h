@@ -222,7 +222,7 @@ auto uses_allocator_construction_args(const Alloc& a, Args&&... args)
 }
 
 template <class T, class Alloc, class... Args>
-T make_using_allocator(const Alloc& a, Args&&... args)
+T make_obj_using_allocator(const Alloc& a, Args&&... args)
 {
     return make_from_tuple<T>(
         uses_allocator_construction_args<T>(a, forward<Args>(args)...));
