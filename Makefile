@@ -2,6 +2,7 @@
 CXX ?= clang++
 OPT = -g -fno-inline
 CXXFLAGS = $(OPT) -std=c++14 -I.
+WD := $(shell basename $(PWD))
 
 TARGETS=copy_swap_transaction make_from_tuple uses_allocator
 
@@ -15,14 +16,11 @@ all: $(TARGETS)
 %.t : %.t.cpp %.h test_assert.h
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-%.html : %.md
-	pandoc --number-sections -s -S $< -o $@
+%.pdf : %.md
+	cd .. && make $(WD)/$@
 
-%.pdf : %.md ../header.tex
-	$(eval DOCNUM=$(shell sed -n  -e '/^% [NDP][0-9x][0-9x][0-9x][0-9x]/s/^% \([NDP][0-9x][0-9x][0-9x][0-9x]\([Rr][0-9]\+\)\?\).*/\1/p' -e '/^[NDP][0-9x][0-9x][0-9x][0-9x]\([Rr][0-9]\+\)\?$$/q' $<))
-	sed -e s/DOCNUM/$(DOCNUM)/g ../header.tex > $*.hdr.tex
-	pandoc --number-sections -f markdown+footnotes+definition_lists -s -S -H $*.hdr.tex $< -o $@
-	rm -f $*.hdr.tex
+%.html : %.md
+	cd .. && make $(WD)/$@
 
 %.docx : %.md
 	pandoc --number-sections -s -S $< -o $@

@@ -1,6 +1,6 @@
-% P0591r3 | Utility functions to implement uses-allocator construction
+% P0591r4 | Utility functions to implement uses-allocator construction
 % Pablo Halpern <phalpern@halpernwightsoftware.com>
-% 2018-04-02 | Target audience: LWG
+% 2018-11-07 | Target audience: LWG
 
 Abstract
 ========
@@ -28,8 +28,26 @@ features simpler to describe and future-proof against other changes.
 Because this proposal modifies wording in the standard, it is targeted at
 C++20 (aka, C++Next) rather than at a technical specification.
 
+History
+=======
+
+Revision R4 approved by LWG in San Diego, 2018-11-07
+
+Changes from R3
+---------------
+
+ * Wording fixes from LWG review.
+
+ * Added missing function overloads to the synopsis section.
+
+ * Cleaned up description of _uses-allocator construction_.
+
+ * Fleshed out WP deltas to `polymorphic_allocator` and `scoped_allocator_adaptor`.
+
+ * Rebased to Oct 2018 C++ Working Draft
+
 Changes from R2
-===============
+---------------
 
  * Renamed `make_using_allocator` to `make_obj_using_allocator` as per LEWG
    vote in Jacksonville.
@@ -39,7 +57,7 @@ Changes from R2
  * Changed audience to LWG after approval by LEWG in Jacksonville, March 2018.
 
 Changes from R1
-===============
+---------------
 
  * Fix bugs in formal wording. Everything in this paper has been implemented
    and tested (and a link to the implementation added).
@@ -52,7 +70,7 @@ Changes from R1
  * Minor editorial changes.
 
 Changes from R0
-===============
+---------------
 
  * Fixed function template prototypes, which incorrectly depended on partial
    specialization of functions.
@@ -123,173 +141,269 @@ A working implementation of this proposal can be found on GitHub at
 Proposed wording
 ================
 
-Wording is relative to the March 2017 DIS, N4660.
+Wording is relative to the October 2018 WP,
+[N4778](http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2018/n4778.pdf)
 
 Header `<memory>` synopsis [memory.syn]
 ---------------------------------------
 
-Add the following new function templates to the to the `<memory>` synopsis:
+**Add the following new function templates to the to the `<memory>` synopsis:**
 
     template <class T, class Alloc, class... Args>
-      auto uses_allocator_construction_args(const Alloc& a, Args&&... args) -> see below;
+      auto uses_allocator_construction_args(const Alloc& alloc,
+                                            Args&&... args) -> see below;
+
+    template <class T, class Alloc, class Tuple1, class Tuple2>
+      auto uses_allocator_construction_args(const Alloc& alloc, piecewise_construct_t,
+                                            Tuple1&& x, Tuple2&& y) -> see below;
+
+    template <class T>
+      auto uses_allocator_construction_args(const Alloc& alloc) -> see below;
+
+    template <class T, class Alloc, class U, class V>
+      auto uses_allocator_construction_args(const Alloc& alloc, U&& u, V&& v) -> see below;
+
+    template <class T, class Alloc, class U, class V>
+      auto uses_allocator_construction_args(const Alloc& alloc,
+                                            const pair<U,V>& pr) -> see below;
+
+    template <class T, class Alloc, class U, class V>
+      auto uses_allocator_construction_args(const Alloc& alloc, pair<U,V>&& pr) -> see below;
 
     template <class T, class Alloc, class... Args>
-      T* uninitialized_construct_using_allocator(T* p,
-                                                 const Alloc& a,
-                                                 Args&&... args);
+      T make_obj_using_allocator(const Alloc& alloc, Args&&... args);
 
     template <class T, class Alloc, class... Args>
-      T make_obj_using_allocator(const Alloc& a, Args&&... args);
+      T* uninitialized_construct_using_allocator(T* p, const Alloc& alloc, Args&&... args);
 
 Uses-allocator construction [allocator.uses.construction]
 ---------------------------------------------------------
 
-Add the following descriptions to uses-allocator-construction.
+**Replace the entire [allocator.uses.construction] section with the following:**
 
-**Guidance needed**: The wording below expresses
-  `uses_allocator_construction_args` as a bunch of overloads using "does not
-  participate in overload-resolution" wording. It could also be expressed as a
-  single (variadic) function with a bunch of special cases called out, or it
-  could be described with less code and more descriptive English.  Which
-  is better for comprehending the standard?
+_Uses-allocator construction_ with allocator `alloc` and constructor arguments
+`args...` refers to the construction of an object of type `T` such that
+`alloc` is passed to the constructor of `T` if `T` uses an allocator type
+compatible with `alloc`. When applied to the construction of an object of type
+`T`, it is equivalent to initializing it with the value of the expression
+`make_obj_using_allocator<T>(alloc, args...)`, described below.
 
-**Guidance needed**: The wording uses `forward_as_tuple`, which prevents
-  copies, and doesn't require copy- or move-constructibility, but can result
-  in dangling references if the resulting `tuple` outlives the full expression
-  in which it was created. Should I repeat the cautionary
-  words already found in the description of `forward_as_tuple`?
+The following utility functions support three conventions for passing `alloc`
+to a constructor:
+
+ 1. If `T` does not use an allocator compatible with `alloc`, then `alloc` is
+    ignored.
+
+ 2. Otherwise, if `T` has a constructor invocable as `T(allocator_arg, alloc, args...)`
+    (leading-allocator convention), then uses-allocator construction chooses
+    this constructor form.
+
+ 3. Otherwise, if `T` has a constructor invocable as `T(args..., allocator)`
+    (trailing-allocator convention), then uses-allocator construction chooses
+    this constructor form.
+
+The `uses_allocator_construction_args` function template takes an allocator
+and argument list and produces (as a tuple) a new argument list matching one
+of the above conventions.  Additionally, overloads are provided that treat
+specializations of `std::pair` such that uses-allocator construction is
+applied individually to the `first` and `second` data members. The
+`make_obj_using_allocator` and `uninitialized_construct_using_allocator`
+function templates apply the modified constructor arguments to construct
+an object of type `T` as a return value
+or in-place, respectively.
+[_Note:_ For
+`uses_allocator_construction_args` and `make_obj_using_allocator`, type `T`
+is not deduced and must therefore be specified explicitly by the caller. - _end note_]
 
     template <class T, class Alloc, class... Args>
-      auto uses_allocator_construction_args(const Alloc& a, Args&&... args) -> see below;
+      auto uses_allocator_construction_args(const Alloc& alloc, Args&&... args) -> see below;
 
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution if `T`
-  is a specialization of `std::pair`.
+> _Constraints_: `T` is _not_ a specialization of `std::pair`.
 
 > _Returns_: A `tuple` value determined as follows: 
 
-> - if `uses_allocator_v<T, Alloc>` is false and
+> - If `uses_allocator_v<T, Alloc>` is false and
     `is_constructible_v<T, Args...>` is true, return
     `forward_as_tuple(std::forward<Args>(args)...)`.
 
-> - otherwise, if `uses_allocator_v<T, Alloc>` is true and
+> - Otherwise, if `uses_allocator_v<T, Alloc>` is true and
     `is_constructible_v<T, allocator_arg_t, Alloc, Args...>` is true, return
-    `forward_as_tuple(allocator_arg, alloc, std::forward<Args>(args)...)`.
+    `tuple<allocator_arg_t, const Alloc&, Args&&...>(allocator_arg, alloc, std::forward<Args>(args)...)`.
 
-> - otherwise, if `uses_allocator_v<T, Alloc>` is true and
+> - Otherwise, if `uses_allocator_v<T, Alloc>` is true and
     `is_constructible_v<T, Args..., Alloc>` is true, return
     `forward_as_tuple(std::forward<Args>(args)..., alloc)`.
 
-> - otherwise, the program is ill-formed. [_Note_: An error will result if
-    `uses_allocator_v<T, Alloc>` is true but the specific constructor does not
-    take an allocator. This definition prevents a silent failure to pass the
-    allocator to a constructor. — _end note_]
+> - Otherwise, the program is ill-formed. [_Note_: This definition prevents a
+silent failure to pass the allocator to a constructor of a type for which
+`uses_allocator_v<T, Alloc>` is true. — _end note_]
 
     template <class T, class Alloc, class Tuple1, class Tuple2>
-      auto uses_allocator_construction_args(const Alloc& a, piecewise_construct_t,
+      auto uses_allocator_construction_args(const Alloc& alloc, piecewise_construct_t,
                                             Tuple1&& x, Tuple2&& y) -> see below;
 
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution unless
-  `T` is a specialization of `std::pair`.
+> _Constraints_: `T` is a specialization of `std::pair`.
 
-> _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
+> _Effects_: For `T` specified as `pair<T1, T2>`, equivalent to:
 
             return make_tuple(piecewise_construct,
-                      apply([&a](auto&&... args1) -> auto {
-                              return uses_allocator_construction_args<T1>(a,
+                      apply([&alloc](auto&&... args1) {
+                              return uses_allocator_construction_args<T1>(alloc,
                                      std::forward<decltype(args1)>(args1)...);
                           }, std::forward<Tuple1>(x)),
-                      apply([&a](auto&&... args2) -> auto {
-                              return uses_allocator_construction_args<T2>(a,
+                      apply([&alloc](auto&&... args2) {
+                              return uses_allocator_construction_args<T2>(alloc,
                                      std::forward<decltype(args2)>(args2)...);
                           }, std::forward<Tuple2>(y)));
 
     template <class T>
-      auto uses_allocator_construction_args(const Alloc& a) -> see below;
+      auto uses_allocator_construction_args(const Alloc& alloc) -> see below;
 
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution unless
-  `T` is a specialization of `std::pair`.
+> _Constraints_: `T` is a specialization of `std::pair`.
 
-> _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
-  `uses_allocator_construction_args<pair<T1,T2>>(a, piecewise_construct,
-  tuple<>{}, tuple<>{})`
+> _Effects_: Equivalent to:
 
-    template <class T, class Alloc, class U, class V>
-      auto uses_allocator_construction_args(const Alloc& a, U&& u, V&& v) -> see below;
-
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution unless
-  `T` is a specialization of `std::pair`.
-
-> _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
-  `uses_allocator_construction_args<pair<T1,T2>>(a,
-  piecewise_construct, forward_as_tuple(std::forward<U>(u)),
-  forward_as_tuple(std::forward<V>(v)))`.
+            return uses_allocator_construction_args<T>(alloc, piecewise_construct,
+                                                       tuple<>{}, tuple<>{});
 
     template <class T, class Alloc, class U, class V>
-      auto uses_allocator_construction_args(const Alloc& a, const pair<U,V>& pr) -> see below;
+      auto uses_allocator_construction_args(const Alloc& alloc, U&& u, V&& v) -> see below;
 
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution unless
-  `T` is a specialization of `std::pair`.
+> _Constraints_: `T` is a specialization of `std::pair`.
 
-> _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
-  `uses_allocator_construction_args<pair<T1,T2>>(a, piecewise_construct,
-  forward_as_tuple(pr.first), forward_as_tuple(pr.second))`.
+> _Effects_: Equivalent to:
+
+            return uses_allocator_construction_args<T>(alloc, piecewise_construct, 
+                                                       forward_as_tuple(std::forward<U>(u)),
+                                                       forward_as_tuple(std::forward<V>(v)));
 
     template <class T, class Alloc, class U, class V>
-      auto uses_allocator_construction_args(const Alloc& a, pair<U,V>&& pr) -> see below;
+      auto uses_allocator_construction_args(const Alloc& alloc,
+                                            const pair<U,V>& pr) -> see below;
 
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller. This template does not participate in overload resolution unless
-  `T` is a specialization of `std::pair`.
+> _Constraints_: `T` is a specialization of `std::pair`.
 
-> _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
-  `uses_allocator_construction_args<pair<T1,T2>>(a,
-  piecewise_construct, forward_as_tuple(std::forward<U>(pr.first)),
-  forward_as_tuple(std::forward<V>(pr.second)))`.
+> _Effects_: Equivalent to:
+
+            return uses_allocator_construction_args<T>(alloc, piecewise_construct,
+                                                       forward_as_tuple(pr.first),
+                                                       forward_as_tuple(pr.second));
+
+    template <class T, class Alloc, class U, class V>
+      auto uses_allocator_construction_args(const Alloc& alloc, pair<U,V>&& pr) -> see below;
+
+> _Constraints_: `T` is a specialization of `std::pair`.
+
+> _Effects_: Equivalent to:
+
+            return uses_allocator_construction_args<T>(alloc, piecewise_construct,
+                                                       forward_as_tuple(std::move(pr).first),
+                                                       forward_as_tuple(std::move(pr).second));
 
     template <class T, class Alloc, class... Args>
-      T make_obj_using_allocator(const Alloc& a, Args&&... args);
+      T make_obj_using_allocator(const Alloc& alloc, Args&&... args);
 
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller.
+> _Effects_: Equivalent to:
 
-> _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to
-
-            make_from_tuple<T>(
-                uses_allocator_construction_args<T>(a, forward<Args>(args)...));
+            return make_from_tuple<T>(
+                       uses_allocator_construction_args<T>(alloc, std::forward<Args>(args)...));
 
     template <class T, class Alloc, class... Args>
-      T* uninitialized_construct_using_allocator(T* p,
-                                                 const Alloc& a,
-                                                 Args&&... args);
+      T* uninitialized_construct_using_allocator(T* p, const Alloc& alloc, Args&&... args);
 
-> _Remark_: `T` is not deduced and must therefore be specified explicitly by
-  the caller.
+> _Effects_: Equivalent to:
 
-> _Returns_: For `T` specified as `pair<T1, T2>`, equivalent to:
-
-            return apply([p](auto&&... args2){
-                    return ::new(static_cast<void*>(p))
-                        T(forward<decltype(args2)>(args2)...);
-                }, uses_allocator_construction_args<T>(a, forward<Args>(args)...));
-
-**Guidance Needed**: Should we consider adding
-`uninitialized_construct_from_tuple` as a separate (non-exposition) function,
-since it appears to be useful and would simplify (or perhaps eliminate the
-need for) `uninitialized_construct_using_allocator`.
+            return ::new(static_cast<void*>(p)) 
+                       T(make_obj_using_allocator<T>(alloc, std::forward<Args>(args)...));
 
 Changes to `polymorphic_allocator` and `scoped_allocator_adaptor`
 -----------------------------------------------------------------
 
-Rewrite the `construct` methods of `polymorphic_allocator`
-[mem.poly.allocator.mem] and `scoped_allocator_adaptor`
-[allocator.adaptor.members] to simply call
-`uninitialized_construct_from_tuple`.
+**In [mem.poly.allocator.class], remove the second through sixth `construct`
+member functions from `polymorphic_allocator`, (i.e., those whose first
+argument is a `pair`):** 
 
-Consider replacing all uses of _uses allocator construction_ with references
-to these functions and removing  _uses allocator construction_ from the
-standard.
+    template<class T, class... Args>
+      void construct(T* p, Args&&... args);
+
+~~template<class T1, class T2, class... Args1, class... Args2>  
+void construct(pair<T1, T2>* p, piecewise_construct_t,  
+               tuple<Args1...> x, tuple<Args2...> y);  
+template<class T1, class T2>  
+  void construct(pair<T1, T2>* p);  
+template<class T1, class T2, class U, class V>  
+  void construct(pair<T1, T2>* p, U&& x, V&& y);  
+template<class T1, class T2, class U, class V>  
+  void construct(pair<T1, T2>* p, const pair<U, V>& pr);  
+template<class T1, class T2, class U, class V>  
+  void construct(pair<T1, T2>* p, pair<U, V>&& pr);~~
+
+**In [mem.poly.allocator.mem], , remove the second through sixth `construct`
+member functions from `polymorphic_allocator`, (i.e., those whose first
+argument is a `pair`).** 
+
+**In [mem.poly.allocator.mem], make the following edits to the first `construct`
+member function description:**
+
+    template<class T, class... Args>
+      void construct(T* p, Args&&... args);
+
+> ~~_Requires_~~ _Mandates_: Uses-allocator construction of `T` with allocator `*this`
+(see 19.10.8.2) and constructor arguments `std::forward<Args>(args)...` is
+well-formed. ~~[_Note:_ Uses-allocator construction is always well formed for
+types that do not use allocators. - _end note_]~~
+
+> _Effects_: Construct a T object in the storage whose address is represented by
+`p` by uses-allocator construction with allocator `*this` and constructor
+arguments `std::forward<Args>(args)...`.
+
+> _Throws_: Nothing unless the constructor for `T` throws.
+
+> ~~_Remarks_: This function shall not participate in overload resolution if `T` is
+a specialization of `pair`.~~
+
+**In [allocator.adaptor.syn], remove the second through sixth
+`construct` member functions (the same ones removed from the synopsis) and
+their entire descriptions.**
+
+    template<class T, class... Args>
+      void construct(T* p, Args&&... args);
+
+~~template<class T1, class T2, class... Args1, class... Args2>  
+void construct(pair<T1, T2>* p, piecewise_construct_t,  
+               tuple<Args1...> x, tuple<Args2...> y);  
+template<class T1, class T2>  
+  void construct(pair<T1, T2>* p);  
+template<class T1, class T2, class U, class V>  
+  void construct(pair<T1, T2>* p, U&& x, V&& y);  
+template<class T1, class T2, class U, class V>  
+  void construct(pair<T1, T2>* p, const pair<U, V>& pr);  
+template<class T1, class T2, class U, class V>  
+  void construct(pair<T1, T2>* p, pair<U, V>&& pr);~~
+
+**In [allocator.adaptor.members], remove the second through sixth
+`construct` member functions (the same ones removed from the synopsis) and
+their entire descriptions.**
+
+**In [allocator.adaptor.members], completely replace the _Effects_ and _Remarks_ clauses for
+the first `construct` member function:**
+
+     template<class T, class... Args>
+       void construct(T* p, Args&&... args);
+
+>~~_Effects_:~~
+
+>~~— If uses_allocator_v<T, inner_allocator_type> is false...~~
+
+>~~... _Remarks_: This function shall not participate in overload resolution
+>if T is a specialization of pair.~~
+
+>_Effects_: Equivalent to:
+
+            apply([p,this](auto&&... newargs){
+                    OUTERMOST_ALLOC_TRAITS(*this)::construct(
+                      OUTERMOST(*this), p, std::forward<decltype(newargs)>(newargs)...);
+                  }, uses_allocator_construction_args(inner_allocator(),
+                                                      std::forward<Args>(args)...));
+
+**Drafting note:** `OUTERMOST_ALLOC_TRAITS` and `OUTERMOST` should be _italicized_.
