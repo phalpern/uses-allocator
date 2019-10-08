@@ -448,7 +448,7 @@ void runTest()
         TEST_ASSERT(usesAlloc ==
                     (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
         TEST_ASSERT(PrefixAlloc ==
-                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+                    (match_tuple_element<0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.value());
@@ -481,7 +481,7 @@ void runTest()
         TEST_ASSERT(usesAlloc ==
                     (match_tuple_element<allocArg,const IntAlloc&>(args, A1)));
         TEST_ASSERT(PrefixAlloc ==
-                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+                    (match_tuple_element<0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(val == V.value());
@@ -511,7 +511,7 @@ void runTest()
         TEST_ASSERT(usesMemRsrc ==
                     (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
         TEST_ASSERT(PrefixRsrc ==
-                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+                    (match_tuple_element<0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.value());
@@ -544,7 +544,7 @@ void runTest()
         TEST_ASSERT(usesMemRsrc ==
                     (match_tuple_element<rsrcArg,const MyPmrPtr&>(args, pR1)));
         TEST_ASSERT(PrefixRsrc ==
-                    (match_tuple_element<0,const allocator_arg_t&>(args)));
+                    (match_tuple_element<0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(val == V.value());
@@ -653,9 +653,9 @@ void runPairTest()
                     (match_tuple_element2<2, allocArg2,const IntAlloc&>(args,
                                                                         A1)));
         TEST_ASSERT(PrefixAlloc1 ==
-                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<1, 0,allocator_arg_t>(args)));
         TEST_ASSERT(PrefixAlloc2 ==
-                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<2, 0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.first.value());
@@ -724,9 +724,9 @@ void runPairTest()
                     (match_tuple_element2<2, allocArg2,const IntAlloc&>(args,
                                                                         A1)));
         TEST_ASSERT(PrefixAlloc1 ==
-                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<1, 0,allocator_arg_t>(args)));
         TEST_ASSERT(PrefixAlloc2 ==
-                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<2, 0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
@@ -796,9 +796,9 @@ void runPairTest()
                     (match_tuple_element2<2, allocArg2,const IntAlloc&>(args,
                                                                         A1)));
         TEST_ASSERT(PrefixAlloc1 ==
-                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<1, 0,allocator_arg_t>(args)));
         TEST_ASSERT(PrefixAlloc2 ==
-                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<2, 0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
@@ -868,9 +868,9 @@ void runPairTest()
                     (match_tuple_element2<2, allocArg2,const IntAlloc&>(args,
                                                                         A1)));
         TEST_ASSERT(PrefixAlloc1 ==
-                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<1, 0,allocator_arg_t>(args)));
         TEST_ASSERT(PrefixAlloc2 ==
-                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<2, 0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
@@ -924,9 +924,9 @@ void runPairTest()
                     (match_tuple_element2<2, allocArg2,const MyPmrPtr&>(args,
                                                                         pR1)));
         TEST_ASSERT(PrefixRsrc1 ==
-                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<1, 0,allocator_arg_t>(args)));
         TEST_ASSERT(PrefixRsrc2 ==
-                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<2, 0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(args);
         TEST_ASSERT(0 == V.first.value());
@@ -995,9 +995,9 @@ void runPairTest()
                     (match_tuple_element2<2, allocArg2,const MyPmrPtr&>(args,
                                                                         pR1)));
         TEST_ASSERT(PrefixRsrc1 ==
-                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<1, 0,allocator_arg_t>(args)));
         TEST_ASSERT(PrefixRsrc2 ==
-                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<2, 0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());
@@ -1067,9 +1067,9 @@ void runPairTest()
                     (match_tuple_element2<2, allocArg2,const MyPmrPtr&>(args,
                                                                         pR1)));
         TEST_ASSERT(PrefixRsrc1 ==
-                    (match_tuple_element2<1, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<1, 0,allocator_arg_t>(args)));
         TEST_ASSERT(PrefixRsrc2 ==
-                    (match_tuple_element2<2, 0,const allocator_arg_t&>(args)));
+                    (match_tuple_element2<2, 0,allocator_arg_t>(args)));
 
         Obj V = std::make_from_tuple<Obj>(std::move(args));
         TEST_ASSERT(val1 == V.first.value());

@@ -66,8 +66,8 @@ auto uses_allocator_args_imp(false_type /* is_pair */,
                              Args&&... args)
 {
     // Allocator added to front of argument list, after `allocator_arg`.
-    return std::forward_as_tuple(allocator_arg, a,
-                                 std::forward<Args>(args)...);
+    return tuple<allocator_arg_t, const Alloc&,
+                 Args&&...>(allocator_arg, a, std::forward<Args>(args)...);
 }
 
 // Return a tuple of arguments appropriate for uses-allocator construction
@@ -90,7 +90,7 @@ auto uses_allocator_args_imp(false_type /* is_pair */,
 // with allocator `Alloc` and ctor arguments `Args`.
 // This overload handles specializations of `T` = `std::pair` for which
 // `has_allocator<T, Alloc>` is true for either or both of the elements and
-// no other constructor arguments are passed in.
+// piecewise_construct arguments are passed in.
 template <class T, class Alloc, class Tuple1, class Tuple2>
 auto uses_allocator_args_imp(true_type  /* is_pair */,
                              true_type  /* has_allocator */,
